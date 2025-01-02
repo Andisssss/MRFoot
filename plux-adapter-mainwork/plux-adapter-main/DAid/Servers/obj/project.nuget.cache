@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "iFRZ7DNxkHXToYGa9o8nLhKvNh3TXAbpMBgdSn8+AVD5xFYTDExT4ZHG+cSHGEaKzrAPEWM2YYzxMvvqF+pgZA==",
+  "success": true,
+  "projectFilePath": "D:\\kasparamamma\\plux-adapter-mainwork\\plux-adapter-main\\DAid\\Servers\\DAid.Servers.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Andisssss\\.nuget\\packages\\commandlineparser\\2.9.1\\commandlineparser.2.9.1.nupkg.sha512",
+    "C:\\Users\\Andisssss\\.nuget\\packages\\nlog\\5.0.0\\nlog.5.0.0.nupkg.sha512"
+  ],
+  "logs": []
+}

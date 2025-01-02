@@ -1,0 +1,119 @@
+{
+  "format": 1,
+  "restore": {
+    "D:\\kasparamamma\\plux-adapter-mainwork\\plux-adapter-main\\DAid\\Clients\\DAid.Clients.csproj": {}
+  },
+  "projects": {
+    "D:\\kasparamamma\\plux-adapter-mainwork\\plux-adapter-main\\DAid\\Clients\\DAid.Clients.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "D:\\kasparamamma\\plux-adapter-mainwork\\plux-adapter-main\\DAid\\Clients\\DAid.Clients.csproj",
+        "projectName": "DAid.Clients",
+        "projectPath": "D:\\kasparamamma\\plux-adapter-mainwork\\plux-adapter-main\\DAid\\Clients\\DAid.Clients.csproj",
+        "packagesPath": "C:\\Users\\Andisssss\\.nuget\\packages\\",
+        "outputPath": "D:\\kasparamamma\\plux-adapter-mainwork\\plux-adapter-main\\DAid\\Clients\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\Andisssss\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net48"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net48": {
+            "targetAlias": "net48",
+            "projectReferences": {
+              "D:\\kasparamamma\\plux-adapter-mainwork\\plux-adapter-main\\DAid\\Servers\\DAid.Servers.csproj": {
+                "projectPath": "D:\\kasparamamma\\plux-adapter-mainwork\\plux-adapter-main\\DAid\\Servers\\DAid.Servers.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        }
+      },
+      "frameworks": {
+        "net48": {
+          "targetAlias": "net48",
+          "dependencies": {
+            "CommandLineParser": {
+              "target": "Package",
+              "version": "[2.9.1, )"
+            },
+            "NLog": {
+              "target": "Package",
+              "version": "[5.0.0, )"
+            },
+            "System.Text.Json": {
+              "target": "Package",
+              "version": "[9.0.0, )"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.100\\RuntimeIdentifierGraph.json"
+        }
+      },
+      "runtimes": {
+        "win7-x86": {
+          "#import": []
+        }
+      }
+    },
+    "D:\\kasparamamma\\plux-adapter-mainwork\\plux-adapter-main\\DAid\\Servers\\DAid.Servers.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "D:\\kasparamamma\\plux-adapter-mainwork\\plux-adapter-main\\DAid\\Servers\\DAid.Servers.csproj",
+        "projectName": "DAid.Servers",
+        "projectPath": "D:\\kasparamamma\\plux-adapter-mainwork\\plux-adapter-main\\DAid\\Servers\\DAid.Servers.csproj",
+        "packagesPath": "C:\\Users\\Andisssss\\.nuget\\packages\\",
+        "outputPath": "D:\\kasparamamma\\plux-adapter-mainwork\\plux-adapter-main\\DAid\\Servers\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\Andisssss\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net48"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net48": {
+            "targetAlias": "net48",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        }
+      },
+      "frameworks": {
+        "net48": {
+          "targetAlias": "net48",
+          "dependencies": {
+            "CommandLineParser": {
+              "target": "Package",
+              "version": "[2.9.1, )"
+            },
+            "NLog": {
+              "target": "Package",
+              "version": "[5.0.0, )"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.100\\RuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}

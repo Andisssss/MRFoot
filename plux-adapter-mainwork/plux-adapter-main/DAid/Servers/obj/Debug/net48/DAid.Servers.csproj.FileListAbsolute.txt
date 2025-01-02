@@ -1,0 +1,14 @@
+D:\kasparamamma\plux-adapter-mainwork\plux-adapter-main\DAid\Servers\bin\Debug\net48\DAid.Servers.dll
+D:\kasparamamma\plux-adapter-mainwork\plux-adapter-main\DAid\Servers\bin\Debug\net48\DAid.Servers.pdb
+D:\kasparamamma\plux-adapter-mainwork\plux-adapter-main\DAid\Servers\bin\Debug\net48\DAid.Servers.xml
+D:\kasparamamma\plux-adapter-mainwork\plux-adapter-main\DAid\Servers\bin\Debug\net48\CommandLine.dll
+D:\kasparamamma\plux-adapter-mainwork\plux-adapter-main\DAid\Servers\bin\Debug\net48\NLog.dll
+D:\kasparamamma\plux-adapter-mainwork\plux-adapter-main\DAid\Servers\obj\Debug\net48\DAid.Servers.csproj.AssemblyReference.cache
+D:\kasparamamma\plux-adapter-mainwork\plux-adapter-main\DAid\Servers\obj\Debug\net48\DAid.Servers.GeneratedMSBuildEditorConfig.editorconfig
+D:\kasparamamma\plux-adapter-mainwork\plux-adapter-main\DAid\Servers\obj\Debug\net48\DAid.Servers.AssemblyInfoInputs.cache
+D:\kasparamamma\plux-adapter-mainwork\plux-adapter-main\DAid\Servers\obj\Debug\net48\DAid.Servers.AssemblyInfo.cs
+D:\kasparamamma\plux-adapter-mainwork\plux-adapter-main\DAid\Servers\obj\Debug\net48\DAid.Servers.csproj.CoreCompileInputs.cache
+D:\kasparamamma\plux-adapter-mainwork\plux-adapter-main\DAid\Servers\obj\Debug\net48\DAid.Servers.csproj.CopyComplete
+D:\kasparamamma\plux-adapter-mainwork\plux-adapter-main\DAid\Servers\obj\Debug\net48\DAid.Servers.dll
+D:\kasparamamma\plux-adapter-mainwork\plux-adapter-main\DAid\Servers\obj\Debug\net48\DAid.Servers.xml
+D:\kasparamamma\plux-adapter-mainwork\plux-adapter-main\DAid\Servers\obj\Debug\net48\DAid.Servers.pdb
