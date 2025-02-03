@@ -9,3 +9,5 @@ Client branch contains the necessary files to utilize the connection between uni
 for further instructions on how to run the client, please refer to the original post readme:
 https://github.com/lidlkamynina/plux-adapter?tab=readme-ov-file
 
+Client.cs - Need to change directory of the path you have installed the targeted files
+
