@@ -7,19 +7,26 @@ namespace DAid.Clients
 {
     public class VisualizationWindow : Form
     {
-        private const int CanvasSize = 400; 
-        private double copX = 0; // Center of Pressure X
-        private double copY = 0; // Center of Pressure Y
-        private double[] sensorPressures = Array.Empty<double>(); 
+        private const int CanvasSize = 400;
+        private const int SockSpacing = CanvasSize + 50; // Spacing between socks
+        private const int DataTimeoutMilliseconds = 2000; // Timeout to consider data stale
+
+        private double copXLeft = 0;
+        private double copYLeft = 0;
+        private double[] sensorPressuresLeft = Array.Empty<double>();
+        private DateTime lastLeftDataUpdate = DateTime.MinValue;
+
+        private double copXRight = 0;
+        private double copYRight = 0;
+        private double[] sensorPressuresRight = Array.Empty<double>();
+        private DateTime lastRightDataUpdate = DateTime.MinValue;
 
         public VisualizationWindow()
         {
-            // Initialize the visualization window
             this.Text = "Real-Time CoP Visualization";
-            this.Size = new Size(CanvasSize + 40, CanvasSize + 60);
+            this.Size = new Size(SockSpacing * 2, CanvasSize + 100); // Adjusted width
             this.DoubleBuffered = true;
 
-            // Handle window close events
             this.FormClosing += (sender, e) =>
             {
                 Application.Exit();
@@ -28,114 +35,125 @@ namespace DAid.Clients
             this.Shown += (sender, e) => Console.WriteLine("[VisualizationWindow]: Visualization started.");
         }
 
-        /// <summary>
-        /// Updates the visualization with new Center of Pressure (CoP) and sensor pressure data.
-        /// </summary>
-        public void UpdateVisualization(double x, double y, double[] pressures)
+        public void UpdateVisualization(
+            double xLeft, double yLeft, double[] pressuresLeft,
+            double xRight, double yRight, double[] pressuresRight)
         {
-            if (pressures == null || pressures.Length == 0)
-            {
-                Console.WriteLine("[VisualizationWindow]: No pressure data to update.");
-                return;
-            }
-
             if (InvokeRequired)
             {
-                BeginInvoke(new Action(() => UpdateVisualization(x, y, pressures)));
+                BeginInvoke(new Action(() => UpdateVisualization(xLeft, yLeft, pressuresLeft, xRight, yRight, pressuresRight)));
                 return;
             }
 
-            copX = x;
-            copY = y;
-            sensorPressures = pressures;
-
-            for (int i = 0; i < sensorPressures.Length; i++)
+            // Update left sock data
+            if (pressuresLeft.Length > 0)
             {
-               // Console.WriteLine($"[VisualizationWindow]: Sensor {i + 1} Pressure={sensorPressures[i]:F2}");
+                copXLeft = xLeft;
+                copYLeft = yLeft;
+                sensorPressuresLeft = pressuresLeft;
+                lastLeftDataUpdate = DateTime.Now;
             }
 
-            Invalidate(); // Trigger a repaint
+            // Update right sock data
+            if (pressuresRight.Length > 0)
+            {
+                copXRight = xRight;
+                copYRight = yRight;
+                sensorPressuresRight = pressuresRight;
+                lastRightDataUpdate = DateTime.Now;
+            }
+
+            Invalidate(); // Always trigger a repaint
         }
 
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
             var graphics = e.Graphics;
-
-            // Clear the canvas
             graphics.Clear(Color.White);
 
-            // Draw grid lines
-            graphics.DrawLine(Pens.Gray, CanvasSize / 2, 0, CanvasSize / 2, CanvasSize);
-            graphics.DrawLine(Pens.Gray, 0, CanvasSize / 2, CanvasSize, CanvasSize / 2);
+            // Determine if left and right data is still valid based on timeout
+            bool hasLeftData = (DateTime.Now - lastLeftDataUpdate).TotalMilliseconds < DataTimeoutMilliseconds;
+            bool hasRightData = (DateTime.Now - lastRightDataUpdate).TotalMilliseconds < DataTimeoutMilliseconds;
 
-            if (sensorPressures.Length == 0)
+            // Draw left sock visualization
+            if (hasLeftData)
             {
-                DrawNoDataMessage(graphics);
+                DrawSockVisualization(graphics, copXLeft, copYLeft, sensorPressuresLeft, SockSpacing / 2, false);
+            }
+            else
+            {
+                DrawNoDataMessage(graphics, SockSpacing / 2);
+            }
+
+            // Draw right sock visualization
+            if (hasRightData)
+            {
+                DrawSockVisualization(graphics, copXRight, copYRight, sensorPressuresRight, SockSpacing + SockSpacing / 2, true);
+            }
+            else
+            {
+                DrawNoDataMessage(graphics, SockSpacing + SockSpacing / 2);
+            }
+        }
+
+        private void DrawSockVisualization(Graphics graphics, double copX, double copY, double[] pressures, int xOffset, bool isRightSock)
+        {
+            // Draw grid
+            graphics.DrawLine(Pens.Gray, xOffset, CanvasSize / 2, xOffset + CanvasSize, CanvasSize / 2); // Horizontal center line
+            graphics.DrawLine(Pens.Gray, xOffset + CanvasSize / 2, 0, xOffset + CanvasSize / 2, CanvasSize); // Vertical center line
+
+            if (pressures.Length == 0)
+            {
                 return;
             }
 
-            // Scale CoP to canvas dimensions
-            float scaledX = (float)(CanvasSize / 2 + copX * (CanvasSize / 16));
-            float scaledY = (float)(CanvasSize / 2 - copY * (CanvasSize / 16));
+            // Scale CoP to canvas
+            float scaledX = (float)(xOffset + CanvasSize / 2 + copX * (CanvasSize / 8));
+            float scaledY = (float)(CanvasSize / 2 - copY * (CanvasSize / 8));
 
-            // Draw CoP on the canvas
+            // Draw CoP
             graphics.FillEllipse(Brushes.Red, scaledX - 5, scaledY - 5, 10, 10);
 
-            // Draw sensor pressures
-            DrawPressures(graphics);
+            // Draw pressures
+            DrawPressures(graphics, pressures, xOffset, isRightSock);
         }
 
-        private void DrawPressures(Graphics graphics)
-{
-    // Sensor positions relative to the canvas
-    double[] XPositions = { 4.0, -4.0, 4.0, -4.0 };
-    double[] YPositions = { 2.0, 2.0, -2.0, -2.0 };
-
-    // Get the maximum pressure to normalize intensities
-    double maxPressure = GetMaxPressure(sensorPressures);
-    if (maxPressure <= 0.001)
-    {
-        maxPressure = 1; // Prevent division by zero
-    }
-
-    for (int i = 0; i < sensorPressures.Length; i++)
-    {
-        // Normalize intensity based on maximum pressure
-        float intensity = (float)(sensorPressures[i] / maxPressure);
-        intensity = Math.Max(0, Math.Min(1, intensity)); // Clamp values between 0 and 1
-
-        // Ensure visible red even for low pressures
-        int redValue = (int)(255 * intensity);
-        redValue = Math.Max(50, redValue); // Set minimum visibility threshold for red
-
-        // Determine color based on intensity
-        Color pressureColor = Color.FromArgb(redValue, 0, 0);
-
-        // Scale positions to canvas
-        float scaledX = (float)(CanvasSize / 2 + XPositions[i] * (CanvasSize / 16));
-        float scaledY = (float)(CanvasSize / 2 - YPositions[i] * (CanvasSize / 16));
-
-        // Draw sensor visualization
-        graphics.FillEllipse(new SolidBrush(pressureColor), scaledX - 10, scaledY - 10, 20, 20);
-        graphics.DrawString($"S{i + 1}", new Font("Arial", 8), Brushes.Black, scaledX - 5, scaledY - 15);
-
-        //Console.WriteLine($"Sensor {i + 1}: Pressure={sensorPressures[i]:F2}, Intensity={intensity:F2}");
-    }
-}
-
-
-
-        private void DrawNoDataMessage(Graphics graphics)
+        private void DrawPressures(Graphics graphics, double[] pressures, int xOffset, bool isRightSock)
         {
-            // Display a message when no data is available
-            graphics.DrawString("No Data Available", new Font("Arial", 16, FontStyle.Bold), Brushes.Gray,
-                new PointF(CanvasSize / 2 - 100, CanvasSize / 2 - 20));
+            // These positions define the sensor locations relative to the grid center
+            double[] XPositions = { 6.0, -6.0, 6.0, -6.0 };
+            double[] YPositions = { 2.0, 2.0, -2.0, -2.0 };
+
+            // Mirror the X positions for the right sock
+            if (isRightSock)
+            {
+                XPositions = XPositions.Select(x => -x).ToArray(); // Flip X axis for the right sock
+            }
+
+            double maxPressure = pressures.Length > 0 ? pressures.Max() : 1.0;
+            if (maxPressure <= 0.001) maxPressure = 1.0; // Prevent division by zero
+
+            for (int i = 0; i < pressures.Length; i++)
+            {
+                float intensity = (float)(pressures[i] / maxPressure);
+                intensity = Math.Max(0, Math.Min(1, intensity));
+
+                Color pressureColor = Color.FromArgb((int)(255 * intensity), 0, 0);
+
+                // Scale sensor positions to the canvas
+                float scaledX = (float)(xOffset + CanvasSize / 2 + XPositions[i] * (CanvasSize / 16));
+                float scaledY = (float)(CanvasSize / 2 - YPositions[i] * (CanvasSize / 16));
+
+                graphics.FillEllipse(new SolidBrush(pressureColor), scaledX - 10, scaledY - 10, 20, 20);
+                graphics.DrawString($"S{i + 1}", new Font("Arial", 8), Brushes.Black, scaledX - 5, scaledY - 15);
+            }
         }
 
-        private double GetMaxPressure(double[] pressures)
+        private void DrawNoDataMessage(Graphics graphics, int xOffset)
         {
-            return pressures.Length > 0 ? pressures.Max() : 1.0; // Default to 1.0 to prevent division by zero
+            graphics.DrawString("No Data", new Font("Arial", 16, FontStyle.Bold), Brushes.Gray,
+                new PointF(xOffset + CanvasSize / 4 - 50, CanvasSize / 2 - 20));
         }
     }
 }

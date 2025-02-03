@@ -4,10 +4,5 @@
         <name>DAid.Clients</name>
     </assembly>
     <members>
-        <member name="M:DAid.Clients.VisualizationWindow.UpdateVisualization(System.Double,System.Double,System.Double[])">
-            <summary>
-            Updates the visualization with new Center of Pressure (CoP) and sensor pressure data.
-            </summary>
-        </member>
     </members>
 </doc>

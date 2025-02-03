@@ -241,7 +241,7 @@
         }
       }
     },
-    ".NETFramework,Version=v4.8/win7-x86": {
+    ".NETFramework,Version=v4.8/win-x86": {
       "CommandLineParser/2.9.1": {
         "type": "package",
         "compile": {
@@ -908,19 +908,24 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\Andisssss\\.nuget\\packages\\": {}
+    "C:\\Users\\Lietotajs\\.nuget\\packages\\": {},
+    "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\kasparamamma\\plux-adapter-mainwork\\plux-adapter-main\\DAid\\Clients\\DAid.Clients.csproj",
+      "projectUniqueName": "C:\\Users\\Lietotajs\\Downloads\\MRFoot\\MRFoot\\plux-adapter-mainwork\\plux-adapter-main\\DAid\\Clients\\DAid.Clients.csproj",
       "projectName": "DAid.Clients",
-      "projectPath": "D:\\kasparamamma\\plux-adapter-mainwork\\plux-adapter-main\\DAid\\Clients\\DAid.Clients.csproj",
-      "packagesPath": "C:\\Users\\Andisssss\\.nuget\\packages\\",
-      "outputPath": "D:\\kasparamamma\\plux-adapter-mainwork\\plux-adapter-main\\DAid\\Clients\\obj\\",
+      "projectPath": "C:\\Users\\Lietotajs\\Downloads\\MRFoot\\MRFoot\\plux-adapter-mainwork\\plux-adapter-main\\DAid\\Clients\\DAid.Clients.csproj",
+      "packagesPath": "C:\\Users\\Lietotajs\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\Lietotajs\\Downloads\\MRFoot\\MRFoot\\plux-adapter-mainwork\\plux-adapter-main\\DAid\\Clients\\obj\\",
       "projectStyle": "PackageReference",
+      "fallbackFolders": [
+        "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+      ],
       "configFilePaths": [
-        "C:\\Users\\Andisssss\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Users\\Lietotajs\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
       "originalTargetFrameworks": [
@@ -934,8 +939,8 @@
         "net48": {
           "targetAlias": "net48",
           "projectReferences": {
-            "D:\\kasparamamma\\plux-adapter-mainwork\\plux-adapter-main\\DAid\\Servers\\DAid.Servers.csproj": {
-              "projectPath": "D:\\kasparamamma\\plux-adapter-mainwork\\plux-adapter-main\\DAid\\Servers\\DAid.Servers.csproj"
+            "C:\\Users\\Lietotajs\\Downloads\\MRFoot\\MRFoot\\plux-adapter-mainwork\\plux-adapter-main\\DAid\\Servers\\DAid.Servers.csproj": {
+              "projectPath": "C:\\Users\\Lietotajs\\Downloads\\MRFoot\\MRFoot\\plux-adapter-mainwork\\plux-adapter-main\\DAid\\Servers\\DAid.Servers.csproj"
             }
           }
         }
@@ -944,7 +949,13 @@
         "warnAsError": [
           "NU1605"
         ]
-      }
+      },
+      "restoreAuditProperties": {
+        "enableAudit": "true",
+        "auditLevel": "low",
+        "auditMode": "direct"
+      },
+      "SdkAnalysisLevel": "9.0.100"
     },
     "frameworks": {
       "net48": {
@@ -963,11 +974,11 @@
             "version": "[9.0.0, )"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.100\\RuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.101\\RuntimeIdentifierGraph.json"
       }
     },
     "runtimes": {
-      "win7-x86": {
+      "win-x86": {
         "#import": []
       }
     }

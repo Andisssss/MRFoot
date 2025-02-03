@@ -51,6 +51,11 @@
             Handles raw data received from devices.
             </summary>
         </member>
+        <member name="M:DAid.Servers.Handler.OnCoPUpdated(System.Object,System.ValueTuple{System.String,System.Double,System.Double,System.Double[]})">
+            <summary>
+            Handles CoP and pressure data updates from devices.
+            </summary>
+        </member>
         <member name="M:DAid.Servers.Handler.PrepareResponseBuffer(System.Collections.Generic.IEnumerable{DAid.Servers.Device})">
             <summary>
             Prepares the response buffer with device information.
@@ -78,12 +83,20 @@
         </member>
         <member name="M:DAid.Servers.Manager.Connect(System.String)">
             <summary>
-            Connects to a specified device and sets it as the active device.
+            Connects to a specified device and adds it to the list of active devices.
+            </summary>
+            <summary>
+            Connects to a specified device and adds it to the list of active devices.
             </summary>
         </member>
         <member name="M:DAid.Servers.Manager.GetActiveDevice">
             <summary>
-            Retrieves the currently active device.
+            Retrieves the last connected device (backward compatibility).
+            </summary>
+        </member>
+        <member name="M:DAid.Servers.Manager.GetConnectedDevices">
+            <summary>
+            Retrieves all currently connected active devices.
             </summary>
         </member>
         <member name="M:DAid.Servers.Manager.GetAllDevices">
@@ -111,64 +124,30 @@
             Stops the server and cleans up resources.
             </summary>
         </member>
-        <member name="M:DAid.Servers.Server.HandleCommandAsync(System.String,System.Threading.CancellationToken)">
-            <summary>
-            Processes a command sent by the client.
-            </summary>
-        </member>
-        <member name="M:DAid.Servers.Server.HandleConnectCommandAsync(System.Threading.CancellationToken)">
+        <member name="M:DAid.Servers.Server.HandlePortResponse(System.String,System.String)">
             <summary>
             Connects to a sensor by scanning available COM ports.
             </summary>
         </member>
+        <member name="M:DAid.Servers.Server.HandleCalibrateCommand">
+            <summary>
+            Handles the calibrate command.
+            </summary>
+        </member>
         <member name="M:DAid.Servers.Server.StartDataStream">
             <summary>
-            Starts data acquisition from the sensor.
+            Starts data acquisition for all connected devices.
             </summary>
         </member>
-        <member name="M:DAid.Servers.Server.HandleStartVisualizationCommand">
+        <member name="M:DAid.Servers.Server.StopDataStream">
             <summary>
-            Handles the start command to begin visualization.
-            </summary>
-        </member>
-        <member name="M:DAid.Servers.Server.HandleStopCommand">
-            <summary>
-            Stops data acquisition from the sensor.
+            Stops the data streams for all connected devices.
             </summary>
         </member>
         <member name="M:DAid.Servers.Server.HandleExitCommand">
             <summary>
             Stops the server and exits.
             </summary>
-        </member>
-        <member name="T:DAid.Servers.StreamExtensions">
-            <summary>
-            Provides extension methods for stream operations with cancellation and timeout support.
-            </summary>
-        </member>
-        <member name="M:DAid.Servers.StreamExtensions.ReadAllAsync(System.IO.Stream,System.Int32,System.Threading.CancellationToken,System.Int32)">
-            <summary>
-            Reads a buffer of specified length from the stream with cancellation and timeout support.
-            </summary>
-            <param name="stream">Stream to read from.</param>
-            <param name="length">Length of the buffer to create and fill.</param>
-            <param name="cancellationToken">Token to monitor for cancellation requests.</param>
-            <param name="timeout">Optional timeout in milliseconds (default: infinite).</param>
-            <returns>A filled byte buffer.</returns>
-            <exception cref="T:System.IO.EndOfStreamException">Thrown when the end of the stream is reached prematurely.</exception>
-            <exception cref="T:System.TimeoutException">Thrown if the read operation exceeds the specified timeout.</exception>
-        </member>
-        <member name="M:DAid.Servers.StreamExtensions.ReadAllAsync(System.IO.Stream,System.Byte[],System.Threading.CancellationToken,System.Int32)">
-            <summary>
-            Fills a provided buffer from the stream with cancellation and timeout support.
-            </summary>
-            <param name="stream">Stream to read from.</param>
-            <param name="buffer">Buffer to fill.</param>
-            <param name="cancellationToken">Token to monitor for cancellation requests.</param>
-            <param name="timeout">Optional timeout in milliseconds (default: infinite).</param>
-            <returns>The number of bytes read.</returns>
-            <exception cref="T:System.IO.EndOfStreamException">Thrown when the end of the stream is reached prematurely.</exception>
-            <exception cref="T:System.TimeoutException">Thrown if the read operation exceeds the specified timeout.</exception>
         </member>
     </members>
 </doc>
