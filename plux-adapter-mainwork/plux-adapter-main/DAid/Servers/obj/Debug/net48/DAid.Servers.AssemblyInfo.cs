@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("DAid.Servers")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+70b9cffde88c3735ac3e373c50453f6ebe020e54")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+733e4ed2e647914fb055a81f52010bb1535dcc30")]
 [assembly: System.Reflection.AssemblyProductAttribute("DAid.Servers")]
 [assembly: System.Reflection.AssemblyTitleAttribute("DAid.Servers")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

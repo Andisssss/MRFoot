@@ -8,9 +8,10 @@ namespace DAid.Servers
 {
     public class Server
     {
-        private string[] ports;
         private readonly object syncLock = new object();
         public Manager Manager { get; }
+
+        private string[] ports;
         private bool isRunning;
         private bool isAcquiringData;
 
@@ -80,7 +81,7 @@ namespace DAid.Servers
             }
         }
 
-        /// <summary>
+                /// <summary>
         /// Connects to a sensor by scanning available COM ports.
         /// </summary>
        public void HandlePortResponse(string port1, string port2)
@@ -146,7 +147,6 @@ string[] coms = GetPorts(); // Here you define the ports directly inside the met
     Console.WriteLine("[Server]: All devices connected. Waiting for further commands.");
 }
 
-
         /// <summary>
         /// Handles the calibrate command.
         /// </summary>
@@ -209,7 +209,7 @@ string[] coms = GetPorts(); // Here you define the ports directly inside the met
         /// <summary>
         /// Starts data acquisition for all connected devices.
         /// </summary>
-        private void StartDataStream()
+        public void StartDataStream()
         {
             lock (syncLock)
             {

@@ -25,6 +25,8 @@ namespace DAid.Clients
         private double _copXLeft = 0, _copYLeft = 0;
         private double _copXRight = 0, _copYRight = 0;
 
+        int setCount = 0;
+
         private TcpClient _hmdClient;
         private NetworkStream _hmdStream;
 
@@ -183,16 +185,19 @@ private async Task ListenForPortFileAsync(string filePath)
         Console.WriteLine("Visualization is already running.");
         return;
     }
-    var exercise = ExerciseList.Exercises.FirstOrDefault(e => e.ExerciseID == 1);
-    if (exercise == null)
-    {
-        Console.WriteLine("Error: Exercise not found!");
-        return;
-    }
+     _server.StartDataStream();
     OpenVisualizationWindow();
     SubscribeToDeviceUpdates();
     _isVisualizing = true;
-    await RunExerciseAsync(exercise);
+
+    var firstExercise = ExerciseList.Exercises.FirstOrDefault(e => e.ExerciseID == 1);
+    if (firstExercise == null)
+    {
+        Console.WriteLine("Error: First exercise not found!");
+        return;
+    }
+    await RunExerciseAsync(firstExercise);
+   
 }
 
 private async Task RunExerciseAsync(ExerciseData exercise)
@@ -203,6 +208,8 @@ private async Task RunExerciseAsync(ExerciseData exercise)
     DateTime lastRedZoneWarningTime = DateTime.MinValue;
     bool wasInGreenZone = false;
     bool wasInRedZone = false;
+    bool wasOutOfZone = false;
+    int lastZone = 0; 
 
     Console.WriteLine($"[Exercise]: {exercise.Name} started for {exercise.Timing} seconds...");
 
@@ -210,39 +217,77 @@ private async Task RunExerciseAsync(ExerciseData exercise)
     {
         if (_visualizationWindow == null || _visualizationWindow.IsDisposed) break;
 
-        bool isInGreenZone = false;
-        bool isInRedZone = false;
-
+        double copX = 0, copY = 0;
         if (exercise.LegsUsed.Contains("right"))
         {
-            isInGreenZone = exercise.IsInGreenZone(_copXRight, _copYRight);
-            isInRedZone = exercise.IsInRedZone(_copXRight, _copYRight);
+            copX = _copXRight;
+            copY = _copYRight;
         }
         else if (exercise.LegsUsed.Contains("left"))
         {
-            isInGreenZone = exercise.IsInGreenZone(_copXLeft, _copYLeft);
-            isInRedZone = exercise.IsInRedZone(_copXLeft, _copYLeft);
+            copX = _copXLeft;
+            copY = _copYLeft;
         }
         else if (exercise.LegsUsed.Contains("both"))
         {
-            isInGreenZone = exercise.IsInGreenZone(_copXLeft, _copYLeft) && exercise.IsInGreenZone(_copXRight, _copYRight);
-            isInRedZone = exercise.IsInRedZone(_copXLeft, _copYLeft) || exercise.IsInRedZone(_copXRight, _copYRight);
+            copX = (_copXLeft + _copXRight) / 2; 
+            copY = (_copYLeft + _copYRight) / 2;
         }
 
-        if (isInGreenZone && !wasInGreenZone)
+        // Determine primary zones (Green and Red)
+        bool isGreenZone = exercise.IsInGreenZone(copX, copY);
+        bool isRedZone = exercise.IsInRedZone(copX, copY);
+        bool isOutOfZone = !isGreenZone && !isRedZone;
+
+        // Determine additional position zones (3, 4, 5, 6)
+        int positionZone = 0;
+        if (copX > 0 && copY > 0)
         {
-            Console.WriteLine("Entered Green Zone");
+            positionZone = 3; // Front Right
+        }
+        else if (copX < 0 && copY > 0)
+        {
+            positionZone = 4; // Front Left
+        }
+        else if (copX > 0 && copY < 0)
+        {
+            positionZone = 5; // Back Right
+        }
+        else if (copX < 0 && copY < 0)
+        {
+            positionZone = 6; // Back Left
+        }
+        if (isGreenZone && lastZone != 1)
+        {
+            Console.WriteLine("Zone 1 (Green)");
+            lastZone = 1;
             wasInGreenZone = true;
             wasInRedZone = false;
+            wasOutOfZone = false;
         }
-        else if (isInRedZone && !wasInRedZone)
+        else if (isRedZone && !wasInRedZone)
         {
-            Console.WriteLine("Entered Red Zone. Center your leg.");
+            Console.WriteLine("Zone 2 (Red Zone)");
+            if (positionZone > 0)
+            {
+                Console.WriteLine($"Zone {positionZone}");
+            }
             wasInRedZone = true;
-            wasInGreenZone = false;
+            wasOutOfZone = false;
+            lastZone = 2;
         }
-
-        if (isInGreenZone)
+        else if (isOutOfZone && !wasOutOfZone)
+        {
+            Console.WriteLine("Out of Zone");
+            if (positionZone > 0)
+            {
+                Console.WriteLine($"Zone {positionZone}");
+            }
+            wasOutOfZone = true;
+            wasInRedZone = false;
+            lastZone = 0;
+        }
+        if (isGreenZone)
         {
             outOfZoneTime = DateTime.MinValue;
         }
@@ -263,26 +308,34 @@ private async Task RunExerciseAsync(ExerciseData exercise)
     if (lostBalance)
     {
         Console.WriteLine("You lost balance, exercise restarts in 5 seconds...");
-        await Task.Delay(5000);
-    
-        Console.WriteLine($"Restarting {exercise.Name}...");
+        Thread.Sleep(5000);
         await RunExerciseAsync(exercise);
     }
     else
     {
         Console.WriteLine("Good work! Now is a pause for 15 seconds.");
-        await Task.Delay(15000);
+        Thread.Sleep(15000);
+
+        if (exercise.ExerciseID == 2 && setCount == 0)
+        {
+            setCount++; // Marks that the first set of exercises has been done once
+            var firstExercise = ExerciseList.Exercises.FirstOrDefault(e => e.ExerciseID == 1);
+            if (firstExercise != null)
+            {
+                await RunExerciseAsync(firstExercise);
+            }
+            return;
+        }
 
         int nextExerciseID = exercise.ExerciseID + 1;
         var nextExercise = ExerciseList.Exercises.FirstOrDefault(e => e.ExerciseID == nextExerciseID);
         if (nextExercise != null)
         {
-            Console.WriteLine($"➡️ Starting next exercise: {nextExercise.Name}");
             await RunExerciseAsync(nextExercise);
         }
         else
         {
-            Console.WriteLine("🎉 All exercises completed! Well done.");
+            Console.WriteLine("All exercises completed! Well done.");
             _isVisualizing = false;
         }
     }
@@ -425,6 +478,7 @@ private async Task RunExerciseAsync(ExerciseData exercise)
         Console.WriteLine("GUI launched. Waiting for connection...");
 
         Thread.Sleep(2000); // Ensure the GUI starts
+        
 
         _guiClient = new TcpClient("127.0.0.1", 5555); // Connect to the GUI server
         _guiStream = _guiClient.GetStream();

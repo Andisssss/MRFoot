@@ -73,11 +73,8 @@ namespace DAid.Servers
             {
                 if (IsConnected)
                 {
-                    logger.Info($"Device {Name} on {path} is already connected.");
                     return;
                 }
-
-                logger.Info($"Connecting to device {Name} on {path}...");
                 try
                 {
                     sensorAdapter.Initialize(path, baudRate);
@@ -110,13 +107,11 @@ namespace DAid.Servers
             {
                 if (!IsConnected)
                 {
-                    logger.Warn($"Cannot start acquisition for device {Name} because it is not connected.");
                     return;
                 }
 
                 if (IsStreaming)
                 {
-                    logger.Info($"Data acquisition for device {Name} is already in progress.");
                     return;
                 }
 
@@ -127,7 +122,6 @@ namespace DAid.Servers
 
                     loggingCancellationTokenSource = new CancellationTokenSource();
                     StartLogging(loggingCancellationTokenSource.Token);
-                    logger.Info($"Data acquisition started for device {Name}.");
                 }
                 catch (Exception ex)
                 {
@@ -143,25 +137,19 @@ namespace DAid.Servers
             {
                 if (!IsConnected)
                 {
-                    logger.Warn($"Cannot stop acquisition for device {Name} on {path} because it is not connected.");
                     return;
                 }
 
                 if (!IsStreaming)
                 {
-                    logger.Info($"Data acquisition for device {Name} is not currently running.");
                     return;
                 }
-
-                logger.Info($"Stopping data acquisition for device {Name} on {path}...");
                 try
                 {
                     sensorAdapter.StopSensorStream();
                     StopLogging();
                     loggingCancellationTokenSource?.Cancel();
-                    IsStreaming = false;
-                    logger.Info($"Device {Name} on {path} stopped successfully.");
-                }
+                    IsStreaming = false;                }
                 catch (Exception ex)
                 {
                     logger.Error($"Failed to stop data acquisition for {Name} on {path}: {ex.Message}");
@@ -176,12 +164,10 @@ namespace DAid.Servers
                 bool success = sensorAdapter.Calibrate();
                 if (success)
                 {
-                    logger.Info($"Device {Name} calibration successful.");
                     return true;
                 }
                 else
                 {
-                    logger.Warn($"Device {Name} calibration failed.");
                     return false;
                 }
             }
@@ -198,19 +184,30 @@ private void StartLogging(CancellationToken cancellationToken)
     DateTime? lastTimestamp = null;
 
     var logBuffer = new StringBuilder();
-    logFilePath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"{Name}_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+    logFilePath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"{Name}.txt");
 
-    try
+    // Check if the file exists before writing headers
+    if (!File.Exists(logFilePath))
     {
-        logBuffer.AppendLine("Timestamp\tBattery\tTime_ms\tQ0\tQ1\tQ2\tQ3\tAcc_X\tAcc_Y\tAcc_Z\tSensor1\tSensor2\tSensor3\tSensor4\tSensor5\tSensor6\tSensor7\tSensor8");
-        File.AppendAllText(logFilePath, logBuffer.ToString());
-        logBuffer.Clear();
+        try
+        {
+            logBuffer.AppendLine("Timestamp\tBattery\tTime_ms\tQ0\tQ1\tQ2\tQ3\tAcc_X\tAcc_Y\tAcc_Z\tSensor1\tSensor2\tSensor3\tSensor4\tSensor5\tSensor6\tSensor7\tSensor8");
+            File.AppendAllText(logFilePath, logBuffer.ToString());
+            logBuffer.Clear();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error initializing log file: {ex.Message}");
+            return;
+        }
     }
-    catch (Exception ex)
+    else
     {
-        Console.WriteLine($"Error initializing log file: {ex.Message}");
-        return;
+        string restartMessage = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}\tData receival has resumed.\n";
+        File.AppendAllText(logFilePath, restartMessage);
     }
+
+    isLogging = true; 
 
     Task.Run(async () =>
     {
@@ -220,33 +217,23 @@ private void StartLogging(CancellationToken cancellationToken)
             {
                 while (logQueue.TryDequeue(out string logEntry))
                 {
-
                     string[] parts = logEntry.Split(',');
-                    if (parts.Length < 2)
-                    {
-                        Console.WriteLine($"Malformed log entry: {logEntry}. Skipping...");
-                        continue;
-                    }
+                    if (parts.Length < 2) continue;
 
                     if (!DateTime.TryParse(parts[0], CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime currentTimestamp))
-                    {
                         continue;
-                    }
 
                     byte[] rawData;
                     try
                     {
                         rawData = parts[1].Split('-').Select(hex => Convert.ToByte(hex, 16)).ToArray();
                     }
-                    catch (Exception ex)
+                    catch
                     {
                         continue;
                     }
 
-                    if (rawData.Length < 47 || rawData[0] != 0xF0 || rawData[46] != 0x55)
-                    {
-                        continue;
-                    }
+                    if (rawData.Length < 47 || rawData[0] != 0xF0 || rawData[46] != 0x55) continue;
 
                     try
                     {
@@ -271,7 +258,7 @@ private void StartLogging(CancellationToken cancellationToken)
                         logBuffer.AppendLine($"{currentTimestamp:yyyy-MM-dd HH:mm:ss}\t{battery}\t{timeMs}\t{q0}\t{q1}\t{q2}\t{q3}\t{accX}\t{accY}\t{accZ}\t{sensor1}\t{sensor2}\t{sensor3}\t{sensor4}\t{sensor5}\t{sensor6}\t{sensor7}\t{sensor8}");
                         lastTimestamp = currentTimestamp;
                     }
-                    catch (Exception ex)
+                    catch
                     {
                         continue;
                     }
@@ -295,13 +282,27 @@ private void StartLogging(CancellationToken cancellationToken)
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[Device {Name}]: Error in logging task: {ex.Message}");
         }
     }, cancellationToken);
 }
-        private void StopLogging()
-        {
-            isLogging = false;
-        }
+
+ private void StopLogging()
+{
+    if (!isLogging) return;
+    isLogging = false;
+
+    string stopMessage = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}\tData receival has been stopped.\n";
+
+    try
+    {
+        File.AppendAllText(logFilePath, stopMessage);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[Device {Name}]: Error writing stop message to log file: {ex.Message}");
+    }
+}
 
         private void OnRawDataReceived(object sender, string rawData)
         {
