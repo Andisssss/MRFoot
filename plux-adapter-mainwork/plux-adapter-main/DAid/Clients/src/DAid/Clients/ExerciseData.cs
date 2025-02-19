@@ -3,208 +3,260 @@ using System.Collections.Generic;
 
 public class ExerciseData
 {
-    public int ExerciseID { get; set; } // Added Exercise Number
+    public int ExerciseID { get; set; }
     public string Name { get; set; }
-    public (double Min, double Max) GreenZoneX { get; private set; }
-    public (double Min, double Max) GreenZoneY { get; private set; }
-    public ((double Min, double Max) Range1, (double Min, double Max) Range2) RedZoneX { get; private set; }
-    public ((double Min, double Max) Range1, (double Min, double Max) Range2) RedZoneY { get; private set; }
-    public int Timing { get; set; }
     public string LegsUsed { get; set; }
-
-    public List<(int duration, (double Min, double Max) GreenZoneX, (double Min, double Max) GreenZoneY, 
-             (double Min, double Max) RedZoneX, (double Min, double Max) RedZoneY)> CalibrationSequence { get; set; } 
-             = new List<(int, (double, double), (double, double), (double, double), (double, double))>();
+    public int Intro { get; set; }
+    public int Demo { get; set; }
+    public int PreparationCop { get; set; }
+    public int TimingCop { get; set; }
+    public int Release { get; set; }
+    public int Switch { get; set; }
+    public int Sets { get; private set; }
+    public List<ZoneSequenceItem> ZoneSequence { get; set; }
 
     public ExerciseData(int exerciseID,
-                        string name, 
-                        (double Min, double Max) greenZoneX, 
-                        (double Min, double Max) greenZoneY,
-                        ((double Min, double Max) Range1, (double Min, double Max) Range2) redZoneX, 
-                        ((double Min, double Max) Range1, (double Min, double Max) Range2) redZoneY,
-                        int timing, 
+                        string name,
                         string legsUsed,
-                        List<(int, (double, double), (double, double), (double, double), (double, double))> calibrationSequence)
+                        int intro,
+                        int demo,
+                        int preparationCop,
+                        int timingCop,
+                        int release,
+                        int switchDelay,
+                        int sets,
+                        List<(int duration, (double, double) greenZoneX, (double, double) greenZoneY, (double, double) redZoneX, (double, double) redZoneY)> zoneSequence)
     {
         ExerciseID = exerciseID;
         Name = name;
-        GreenZoneX = greenZoneX;
-        GreenZoneY = greenZoneY;
-        RedZoneX = redZoneX;
-        RedZoneY = redZoneY;
-        Timing = timing;
         LegsUsed = legsUsed;
-       CalibrationSequence = calibrationSequence ?? new List<(int, (double, double), (double, double), (double, double), (double, double))>();  
+        Intro = intro;
+        Demo = demo;
+        PreparationCop = preparationCop;
+        TimingCop = timingCop;
+        Release = release;
+        Switch = switchDelay;
+        Sets = sets > 0 ? sets : 1;
+        ZoneSequence = new List<ZoneSequenceItem>();
+        foreach (var item in zoneSequence)
+        {
+            ZoneSequence.Add(new ZoneSequenceItem
+            {
+                Duration = item.duration,
+                GreenZoneX = item.greenZoneX,
+                GreenZoneY = item.greenZoneY,
+                RedZoneX = item.redZoneX,
+                RedZoneY = item.redZoneY
+            });
+        }
     }
-
-public bool IsInGreenZone(double x, double y)
+}
+public class ZoneSequenceItem
 {
-
-    return x >= GreenZoneX.Min && x <= GreenZoneX.Max &&
-           y >= GreenZoneY.Min && y <= GreenZoneY.Max;
+    public int Duration { get; set; }
+    public (double, double) GreenZoneX { get; set; }
+    public (double, double) GreenZoneY { get; set; }
+    public (double, double) RedZoneX { get; set; }
+    public (double, double) RedZoneY { get; set; }
 }
 
-public bool IsInRedZone(double x, double y)
-{
-    bool isInRedX = 
-        (RedZoneX.Range1.Min <= x && x <= RedZoneX.Range1.Max) || 
-        (RedZoneX.Range2.Min < RedZoneX.Range2.Max && x >= RedZoneX.Range2.Min && x <= RedZoneX.Range2.Max);
-
-    bool isInRedY = 
-        (RedZoneY.Range1.Min <= y && y <= RedZoneY.Range1.Max) || 
-        (RedZoneY.Range2.Min < RedZoneY.Range2.Max && y >= RedZoneY.Range2.Min && y <= RedZoneY.Range2.Max);
-
-    return isInRedX || isInRedY;
-}
-
-}
-
-
-
-// List of Exercises
 public static class ExerciseList
 {
     public static List<ExerciseData> Exercises = new List<ExerciseData>
     {
-        new ExerciseData(
+        new ExerciseData( 
             exerciseID: 1,
             name: "Single-Leg Stance - Right Leg",
-            greenZoneX: (-1.0, 1.0),
-            greenZoneY: (-1.0, 1.0),
-            redZoneX: ((-2.0, -1.0), (1.0, 2.0)), 
-            redZoneY: ((-6.0, -1.5), (1.5, 6.0)),  
-            timing: 30,
             legsUsed: "right",
-            calibrationSequence: new List<(int, (double, double), (double, double), (double, double), (double, double))>()
-        ),
-        new ExerciseData(
-            exerciseID: 2,
-            name: "Single-Leg Stance - Left Leg",
-            greenZoneX: (-1.0, 1.0),
-            greenZoneY: (-1.0, 1.0),
-            redZoneX: ((1.0, 2.0),  (-1.0, -2.0)),
-            redZoneY: ((-6.0, -1.5), (1.5, 6.0)),  
-            timing: 30,
-            legsUsed: "left",
-            calibrationSequence: new List<(int, (double, double), (double, double), (double, double), (double, double))>()
-        ),
-        new ExerciseData(
-            exerciseID: 3,
-            name: "Squats With Toe Rise",
-            greenZoneX: (-1.0, 1.0),
-            greenZoneY: (-1.0, 1.0),
-            redZoneX: ((-2.0, -1.2), (1.2, 3.0)), 
-            redZoneY: ((-6.0, -1.5), (1.5, 6.0)),  
-            timing: 30,
-            legsUsed: "both",
-            calibrationSequence: new List<(int, (double, double), (double, double), (double, double), (double, double))>
+            intro: 1,
+            demo: 3,
+            preparationCop: 3,
+            timingCop: 30,
+            release: 3,
+            switchDelay: 3,
+            sets: 1,
+            zoneSequence: new List<(int, (double, double), (double, double), (double, double), (double, double))>
             {
-                (1, (-1.0, 1.0), (-1.0, 1.0), (-2.0, 0), (-6.0, 6.0)),
-                (3, (-1.0, 1.0), (-1.0, 1.0), (-2.0, 0), (-6.0, 6.0)),
-                (1, (-1.0, 1.0), (-1.0, 1.0), (-2.0, 0), (-6.0, 6.0)),
-                (1, (-1.0, 1.0), (-1.0, 1.0), (-2.0, 0), (-6.0, 6.0)),
-                (1, (-1.0, 1.0), (-1.0, 1.0), (-2.0, 0), (-6.0, 6.0))
+                (30, (-1.0, 1.0), (-1.0, 1.0), (-2.0, -1.0), (-6.0, -1.1))
             }
         ),
-        new ExerciseData(
+        new ExerciseData( 
+            exerciseID: 2,
+            name: "Single-Leg Stance - Left Leg",
+            legsUsed: "left",
+            intro: 0,
+            demo: 0,
+            preparationCop: 0,
+            timingCop: 30,
+            release: 3,
+            switchDelay: 3,
+            sets: 1,
+            zoneSequence: new List<(int, (double, double), (double, double), (double, double), (double, double))>
+            {
+                (30, (-1.0, 1.0), (-1.0, 1.0), (1.0, 2.0), (-6.0, -1.1))
+            }
+        ),
+        new ExerciseData( 
+            exerciseID: 3,
+            name: "Squats With Toe Rise",
+            legsUsed: "both",
+            intro: 1,
+            demo: 3,
+            preparationCop: 3,
+            timingCop: 30,
+            release: 2,
+            switchDelay: 3,
+            sets: 2,
+            zoneSequence: new List<(int, (double, double), (double, double), (double, double), (double, double))>
+            {
+                (1, (-1.0, 1.0), (-1.0, 1.0), (-2.0, -1.0), (-4.0, -2.0)), 
+                (1, (-1.0, 1.0), (-1.0, 1.0), (1.0, 2.0), (1.0, 4.0)),
+                (2, (0.0, 1.5), (-4.5, 4.5), (-1.0, 0.0), (-6.0, -4.5)),
+                (2, (0.0, 1.5), (-4.5, 4.5), (1.5, 2.0), (4.5, 6.0))
+            }
+        ),
+         new ExerciseData( 
             exerciseID: 4,
             name: "Vertical Jumps",
-            greenZoneX: (-1.0, 1.0),
-            greenZoneY: (-1.0, 1.0),
-            redZoneX: ((0.0, 2.0),  (0.0, 0.0)),
-            redZoneY: ((-6.0, -1.5), (1.5, 6.0)),  
-            timing: 30,
             legsUsed: "both",
-            calibrationSequence: new List<(int, (double, double), (double, double), (double, double), (double, double))>()
+            intro: 1,
+            demo: 3,
+            preparationCop: 3,
+            timingCop: 30,
+            release: 2,
+            switchDelay: 3,
+            sets: 2,
+            zoneSequence: new List<(int, (double, double), (double, double), (double, double), (double, double))>
+            {
+                (1, (-1.0, 1.0), (-1.0, 1.0), (-2.0, 2.0), (-4.0, 4.0)),
+                (2, (-1.5, 1.0), (-5.0, 5.0), (-2.0, 1.5), (-6.0, 6.0)),
+                (2, (-1.5, 1.5), (1.0, 2.0), (-2.0, 2.0), (0.0, 1.0))
+            }
         ),
-        new ExerciseData(
+        new ExerciseData( 
             exerciseID: 5,
-            name: "Squats Walking Lunges",
-            greenZoneX: (-1.0, 1.0),
-            greenZoneY: (-1.0, 1.0),
-            redZoneX: ((0.0, 2.0),  (0.0, 0.0)),
-            redZoneY: ((-6.0, -1.5), (1.5, 6.0)),  
-            timing: 60,
+            name: "Squats Walking Lunges - Right Leg",
             legsUsed: "right",
-            calibrationSequence: new List<(int, (double, double), (double, double), (double, double), (double, double))>()
+            intro: 1,
+            demo: 3,
+            preparationCop: 3,
+            timingCop: 50,
+            release: 2,
+            switchDelay: 3,
+            sets: 1,
+            zoneSequence: new List<(int, (double, double), (double, double), (double, double), (double, double))>
+            {
+                (1, (-1.0, 1.0), (-1.0, 1.0), (-2.0, 2.0), (-4.0, 4.0)),
+                (2, (-1.0, 1.0), (-4.0, 4.0), (-1.0, 1.5), (-5.0, 5.0)),
+                (8, (-1.5, 1.5), (1.0, 2.0), (-2.0, 2.0), (0.0, 1.0))
+            }
         ),
-         new ExerciseData(
+        new ExerciseData( 
             exerciseID: 6,
-            name: "Squats Walking Lunges",
-            greenZoneX: (-1.0, 1.0),
-            greenZoneY: (-1.0, 1.0),
-            redZoneX: ((0.0, 2.0),  (0.0, 0.0)),
-            redZoneY: ((-6.0, -1.5), (1.5, 6.0)),  
-            timing: 60,
+            name: "Squats Walking Lunges - Left Leg",
             legsUsed: "left",
-            calibrationSequence: new List<(int, (double, double), (double, double), (double, double), (double, double))>()
+            intro: 0,
+            demo: 0,
+            preparationCop: 0,
+            timingCop: 50,
+            release: 2,
+            switchDelay: 3,
+            sets: 1,
+            zoneSequence: new List<(int, (double, double), (double, double), (double, double), (double, double))>
+            {
+               (1, (-1.0, 1.0), (-1.0, 1.0), (-2.0, 2.0), (-4.0, 4.0)),
+                (2, (1.0, 2.0), (-1.5, 1.5), (0.0, 1.0), (-2.0, 2.0)),
+                (8, (-1.5, 1.5), (1.0, 2.0), (-2.0, 2.0), (0.0, 1.0))
+            }
         ),
-         new ExerciseData(
+        new ExerciseData( 
             exerciseID: 7,
-            name: "Jumping - Lateral Jumps",
-            greenZoneX: (-1.0, 1.0),
-            greenZoneY: (-1.0, 1.0),
-            redZoneX: ((0.0, 2.0),  (0.0, 0.0)),
-            redZoneY: ((-6.0, -1.5), (1.5, 6.0)),  
-            timing: 60,
+            name: "Jumping - Lateral Jumps Right",
             legsUsed: "right",
-            calibrationSequence: new List<(int, (double, double), (double, double), (double, double), (double, double))>()
+            intro: 1,
+            demo: 3,
+            preparationCop: 3,
+            timingCop: 60,
+            release: 2,
+            switchDelay: 3,
+            sets: 1,
+            zoneSequence: new List<(int, (double, double), (double, double), (double, double), (double, double))>
+            {
+                (1, (-1.0, 1.0), (-1.0, 1.0), (-2.0, 2.0), (-4.0, 4.0)),
+                (2, (-1.0, 1.0), (-1.0, 1.0), (-1.8, 1.2), (-6.0, 2.0)),
+                (2, (-1.0, 1.0), (-1.0, 1.0), (-1.2, 1.8), (-6.0, 2.0))
+            }
         ),
-         new ExerciseData(
+        new ExerciseData( 
             exerciseID: 8,
-            name: "Jumping - Lateral Jumps",
-            greenZoneX: (-1.0, 1.0),
-            greenZoneY: (-1.0, 1.0),
-            redZoneX: ((0.0, 2.0),  (0.0, 0.0)),
-            redZoneY: ((-6.0, -1.5), (1.5, 6.0)),  
-            timing: 60,
+            name: "Jumping - Lateral Jumps Left",
             legsUsed: "left",
-            calibrationSequence: new List<(int, (double, double), (double, double), (double, double), (double, double))>()
+            intro: 0,
+            demo: 0,
+            preparationCop: 0,
+            timingCop: 60,
+            release: 2,
+            switchDelay: 3,
+            sets: 1,
+            zoneSequence: new List<(int, (double, double), (double, double), (double, double), (double, double))>
+            {
+                (1, (-1.0, 1.0), (-1.0, 1.0), (-2.0, 2.0), (-4.0, 4.0)),
+                (2, (-1.5, 1.5), (1.0, 2.0), (-2.0, 2.0), (0.0, 1.0)),
+                (2, (-1.5, 1.0), (-5.0, 5.0), (-2.0, 1.5), (-6.0, 6.0))
+            }
         ),
-        new ExerciseData(
+        new ExerciseData( 
             exerciseID: 9,
-            name: "Squats - One-leg Squats",
-            greenZoneX: (-1.0, 1.0),
-            greenZoneY: (-1.0, 1.0),
-            redZoneX:((0.0, 2.0),  (0.0, 0.0)),
-            redZoneY: ((-6.0, -1.5), (1.5, 6.0)),  
-            timing: 60,
+            name: "Squats - One-leg Squats Right",
             legsUsed: "right",
-            calibrationSequence: new List<(int, (double, double), (double, double), (double, double), (double, double))>()
+            intro: 1,
+            demo: 3,
+            preparationCop: 3,
+            timingCop: 60,
+            release: 2,
+            switchDelay: 3,
+            sets: 1,
+            zoneSequence: new List<(int, (double, double), (double, double), (double, double), (double, double))>
+            {
+                (1, (-1.0, 1.0), (-1.0, 1.0), (-2.0, 2.0), (-4.0, 4.0)),
+                (2, (-1.5, 1.0), (-3.5, 3.5), (-2.0, 1.5), (-6.0, 6.0)),
+                (2, (-1.0, 1.0), (-1.0, 1.0), (-2.0, -1.5), (-6.0, 6.0))
+            }
         ),
-        new ExerciseData(
+        new ExerciseData( 
             exerciseID: 10,
-            name: "Squats - One-leg Squats",
-            greenZoneX: (-1.0, 1.0),
-            greenZoneY: (-1.0, 1.0),
-            redZoneX:((0.0, 2.0),  (0.0, 0.0)),
-            redZoneY: ((-6.0, -1.5), (1.5, 6.0)),  
-            timing: 60,
+            name: "Squats - One-leg Squats Left",
             legsUsed: "left",
-            calibrationSequence: new List<(int, (double, double), (double, double), (double, double), (double, double))>()
+            intro: 0,
+            demo: 0,
+            preparationCop: 0,
+            timingCop: 60,
+            release: 2,
+            switchDelay: 3,
+            sets: 1,
+            zoneSequence: new List<(int, (double, double), (double, double), (double, double), (double, double))>
+            {
+                (1, (-1.0, 1.0), (-1.0, 1.0), (-2.0, 2.0), (-4.0, 4.0)),
+                (2, (-1.5, 1.0), (-3.5, 3.5), (-2.0, 1.5), (-6.0, 6.0)),
+                (2, (-1.0, 1.0), (-1.0, 1.0), (-2.0, -1.5), (-6.0, 6.0))
+            }
         ),
-        new ExerciseData(
+    new ExerciseData( 
             exerciseID: 11,
             name: "Jumping - Box Jumps",
-            greenZoneX: (-1.0, 1.0),
-            greenZoneY: (-1.0, 1.0),
-            redZoneX: ((0.0, 2.0),  (0.0, 0.0)),
-            redZoneY: ((-6.0, -1.5), (1.5, 6.0)),  
-            timing: 30,
             legsUsed: "both",
-            calibrationSequence: new List<(int, (double, double), (double, double), (double, double), (double, double))>()
-        ),
-         new ExerciseData(
-            exerciseID: 12,
-            name: "Jumping - Box Jumps, 2nd set",
-            greenZoneX: (-1.0, 1.0),
-            greenZoneY: (-1.0, 1.0),
-            redZoneX: ((0.0, 2.0),  (0.0, 0.0)),
-            redZoneY: ((-6.0, -1.5), (1.5, 6.0)),  
-            timing: 30,
-            legsUsed: "both",
-            calibrationSequence: new List<(int, (double, double), (double, double), (double, double), (double, double))>()
-        ),
-
+            intro: 1,
+            demo: 3,
+            preparationCop: 3,
+            timingCop: 30,
+            release: 2,
+            switchDelay: 3,
+            sets: 2,
+            zoneSequence: new List<(int, (double, double), (double, double), (double, double), (double, double))>
+            {
+                (2, (-1.0, 1.0), (-1.0, 1.0), (-2.0, 2.0), (-4.0, 4.0)),
+                (28, (-1.5, 1.5), (-3.0, 3.0), (-2.0, 2.0), (-4.5, 4.5))
+            }
+        )
     };
 }

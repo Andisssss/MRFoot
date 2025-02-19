@@ -8,23 +8,30 @@ using DAid.Servers;
 using System.Linq;
 using System.Text.Json;
 using System.IO;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
 namespace DAid.Clients
 {
     public class Client
     {
-        
-       string guipath= "C:/Users/Lietotajs/Desktop/Clientgui/bin/Debug/clientgui.exe"; //change
-        string portFilePath = "C:/Users/Lietotajs/Desktop/Clientgui/bin/Debug/selected_ports.txt"; //change
+        string hmdpath = "C:/Users/Lietotajs/Desktop/balls/OculusIntegration_trial.exe"; // change as needed
+        string guipath = "C:/Users/Lietotajs/Desktop/Clientgui/bin/Debug/clientgui.exe"; // change as needed
+        string portFilePath = "C:/Users/Lietotajs/Desktop/Clientgui/bin/Debug/selected_ports.txt"; // change as needed
+
+        private Process _hmdProcess;
         private readonly Server _server;
         private VisualizationWindow _visualizationWindow;
         private bool _isCalibrated = false;
         private bool _isVisualizing = false;
 
+        // Internal sensor values (CoP)
         private double _copXLeft = 0, _copYLeft = 0;
         private double _copXRight = 0, _copYRight = 0;
 
+private ExerciseData _currentExercise;
+        private int _currentPhase;
+        
         int setCount = 0;
 
         private TcpClient _hmdClient;
@@ -32,6 +39,12 @@ namespace DAid.Clients
 
         private TcpClient _guiClient;
         private NetworkStream _guiStream;
+
+        // New flag for exercise active state.
+        private volatile bool _isExerciseActive = false;
+
+        // To store current exercise ID for feedback messages.
+        private int currentExerciseID = 0;
 
         public Client(Server server)
         {
@@ -47,8 +60,8 @@ namespace DAid.Clients
             {
                 Console.Write("> ");
                 string command = Console.ReadLine()?.Trim().ToLower();
-
-                if (string.IsNullOrWhiteSpace(command)) continue;
+                if (string.IsNullOrWhiteSpace(command))
+                    continue;
 
                 if (command == "exit")
                 {
@@ -60,7 +73,6 @@ namespace DAid.Clients
 
                 try
                 {
-                    
                     switch (command)
                     {
                         case "connect":
@@ -70,7 +82,7 @@ namespace DAid.Clients
                             HandleCalibrateCommand();
                             break;
                         case "start":
-                            HandleStartCommand();
+                            await HandleStartCommand();
                             break;
                         case "stop":
                             HandleStopCommand();
@@ -79,11 +91,11 @@ namespace DAid.Clients
                             HandleHMDCommand();
                             break;
                         case "gui":
-                             OpenGUI();
+                            OpenGUI();
                             break;
-                        case "exit": 
-                        HandleExitCommand();
-                        break;
+                        case "exit":
+                            HandleExitCommand();
+                            break;
                         default:
                             Console.WriteLine("Unknown command. Valid commands: connect, calibrate, start, stop, hmd, exit.");
                             break;
@@ -96,252 +108,395 @@ namespace DAid.Clients
             }
         }
 
- private void HandleExitCommand()
+        private void HandleExitCommand()
         {
             Console.WriteLine("Stopping client...");
-                    _server.Stop();
-                    DisconnectFromHMD();
-                     CloseGUI();
+            _server.Stop();
+            CloseHMD();
+            DisconnectFromHMD();
+            CloseGUI();
         }
-                   
-      private async Task HandleConnectCommandAsync(CancellationToken cancellationToken)
-{
-    Console.WriteLine("[Client]: Requesting available COM ports from the server...");
 
-    await _server.HandleConnectCommandAsync(
-        cancellationToken,
-        async ports =>
+        private async Task HandleConnectCommandAsync(CancellationToken cancellationToken)
         {
-            string portsList = string.Join(",", ports);
-            SendMessageToGUI(portsList);
+            Console.WriteLine("[Client]: Requesting available COM ports from the server...");
 
-            string filePath = portFilePath;
-            Console.WriteLine("[Client]: Waiting for selected ports file...");
-            await ListenForPortFileAsync(filePath);
+            await _server.HandleConnectCommandAsync(
+                cancellationToken,
+                async ports =>
+                {
+                    string portsList = string.Join(",", ports);
+                    SendMessageToGUI(portsList);
+                    string filePath = portFilePath;
+                    Console.WriteLine("[Client]: Waiting for selected ports file...");
+                    await ListenForPortFileAsync(filePath);
 
-            string fileContent = File.ReadAllText(filePath).Trim();
-            if (string.IsNullOrEmpty(fileContent))
-            {
-                Console.WriteLine("[Client]: File is empty. No ports to send.");
-                return;
-            }
+                    string fileContent = File.ReadAllText(filePath).Trim();
+                    if (string.IsNullOrEmpty(fileContent))
+                    {
+                        Console.WriteLine("[Client]: File is empty. No ports to send.");
+                        return;
+                    }
 
-            string[] portArray = fileContent.Split(',');
-            if (portArray.Length < 2)
-            {
-                Console.WriteLine("[Client]: Error - Expected two ports.");
-                return;
-            }
+                    string[] portArray = fileContent.Split(',');
+                    if (portArray.Length < 2)
+                    {
+                        Console.WriteLine("[Client]: Error - Expected two ports.");
+                        return;
+                    }
 
-            string port1 = portArray[0].Trim();
-            string port2 = portArray[1].Trim();
-            Console.WriteLine($"[Client]: Chosen ports: {port1} and {port2}");
+                    string port1 = portArray[0].Trim();
+                    string port2 = portArray[1].Trim();
+                    Console.WriteLine($"[Client]: Chosen ports: {port1} and {port2}");
+                    _server.HandlePortResponse(port1, port2);
+                });
 
-            // Send the selected ports directly to the server
-            _server.HandlePortResponse(port1, port2);
-        });
+            Console.WriteLine("[Client]: HandleConnectCommandAsync completed.");
+            File.Delete(portFilePath);
+        }
 
-    // After completing the connection task, ensure we keep listening for further GUI responses
-    Console.WriteLine("[Client]: HandleConnectCommandAsync completed.");
-    File.Delete(portFilePath);
-}
-
-
-private async Task ListenForPortFileAsync(string filePath)
-{
-    Console.WriteLine($"[Client]: Waiting for file '{filePath}'...");
-    while (!File.Exists(filePath))
-    {
-        await Task.Delay(500);
-    }
-    Console.WriteLine($"[Client]: File '{filePath}' detected.");
-}
-
+        private async Task ListenForPortFileAsync(string filePath)
+        {
+            Console.WriteLine($"[Client]: Waiting for file '{filePath}'...");
+            while (!File.Exists(filePath))
+                await Task.Delay(500);
+            Console.WriteLine($"[Client]: File '{filePath}' detected.");
+        }
 
         private void HandleCalibrateCommand()
         {
             if (_isCalibrated)
             {
                 Console.WriteLine("Sensors are already calibrated. Use 'start' to begin visualization.");
+                SendMessageToGUI("Sensors are already calibrated. Use 'start' to begin visualization.");
                 return;
             }
-
             Console.WriteLine("Requesting server to calibrate connected devices...");
+            SendMessageToGUI("Requesting server to calibrate connected devices...");
             _server.HandleCalibrateCommand();
             _isCalibrated = true;
-
             Console.WriteLine("Calibration completed. Use 'start' to begin visualization.");
         }
 
-         private async Task HandleStartCommand()
-{
-    if (!_isCalibrated)
-    {
-        Console.WriteLine("Calibration is required before starting visualization. Use 'calibrate' first.");
-        return;
-    }
-    if (_isVisualizing)
-    {
-        Console.WriteLine("Visualization is already running.");
-        return;
-    }
-     _server.StartDataStream();
-    OpenVisualizationWindow();
-    SubscribeToDeviceUpdates();
-    _isVisualizing = true;
+        private async Task HandleStartCommand()
+        {
+            if (!_isCalibrated)
+            {
+                Console.WriteLine("Calibration is required before starting visualization. Use 'calibrate' first.");
+                SendMessageToGUI("Calibration is required before starting visualization. Use 'calibrate' first.");
+                return;
+            }
+            if (_isVisualizing)
+            {
+                Console.WriteLine("Visualization is already running.");
+                SendMessageToGUI("Visualization is already running.");
+                return;
+            }
+            _server.StartDataStream();
+           OpenVisualizationWindow();
+            ConnectToHMD("127.0.0.1", 9001);
+            SubscribeToDeviceUpdates();
+            _isVisualizing = true;
 
-    var firstExercise = ExerciseList.Exercises.FirstOrDefault(e => e.ExerciseID == 1);
-    if (firstExercise == null)
+            var exercises = ExerciseList.Exercises;
+            var completedExerciseSets = new HashSet<int>();
+
+    // repeating exercise groups after left and right
+    var repeatSet = new Dictionary<int, List<int>>
     {
-        Console.WriteLine("Error: First exercise not found!");
-        return;
+        { 2, new List<int> { 1, 2 } },  // Repeat 1 & 2 after 2
+        { 6, new List<int> { 5, 6 } },  // Repeat 5 & 6 after 6
+        { 8, new List<int> { 7, 8 } },  // Repeat 7 & 8 after 8
+        { 10, new List<int> { 9, 10 } } // Repeat 9 & 10 after 10
+    };
+
+ for (int i = 0; i < exercises.Count; i++)
+    {
+        var exercise = exercises[i];
+        int count = 0;
+            
+                
+        SendExerciseConfiguration(exercise);
+        if (i == 1 && count == 0)
+            {
+                count++;
+                Thread.Sleep(2000);
+            }
+         if (!completedExerciseSets.Contains(exercise.ExerciseID))
+         {
+              if (exercise.Intro > 0)
+            {
+                await Task.Delay(2000).ConfigureAwait(false);
+                Console.WriteLine($"[Intro]: Waiting {exercise.Intro} sec...");
+                await Task.Delay(exercise.Intro * 1000).ConfigureAwait(false);
+            }
+
+            if (exercise.Demo > 0)
+            {
+                Console.WriteLine($"[Demo]: Showing {exercise.Demo} sec...");
+                await Task.Delay(exercise.Demo * 1000).ConfigureAwait(false);
+            }
+         }
+         if (exercise.PreparationCop > 0)
+            {
+                await CheckPreparationCop(exercise.PreparationCop);
+            }
+            
+        await RunExerciseAsync(exercise).ConfigureAwait(false);
+        if (repeatSet.TryGetValue(exercise.ExerciseID, out var repeatExercises) && !completedExerciseSets.Contains(exercise.ExerciseID))
+        {
+            completedExerciseSets.Add(exercise.ExerciseID);
+            Console.WriteLine($"Repeating Exercises: {string.Join(", ", repeatExercises)}...");
+            foreach (var repeatID in repeatExercises)
+            {
+                var repeatExercise = exercises.FirstOrDefault(e => e.ExerciseID == repeatID);
+                if (repeatExercise != null)
+                {
+                    
+                    SendExerciseConfiguration(repeatExercise);
+                    await RunExerciseAsync(repeatExercise).ConfigureAwait(false);
+                }
+            }
+        }
     }
-    await RunExerciseAsync(firstExercise);
-   
+    Console.WriteLine("All exercises completed!");
+    _isVisualizing = false;
 }
 
-private async Task RunExerciseAsync(ExerciseData exercise)
+    private async Task CheckPreparationCop(int duration)
 {
+    Console.WriteLine($"[Preparation CoP]: Checking for {duration} sec...");
     DateTime startTime = DateTime.Now;
-    DateTime outOfZoneTime = DateTime.MinValue;
-    bool lostBalance = false;
-    DateTime lastRedZoneWarningTime = DateTime.MinValue;
-    bool wasInGreenZone = false;
-    bool wasInRedZone = false;
-    bool wasOutOfZone = false;
-    int lastZone = 0; 
-
-    Console.WriteLine($"[Exercise]: {exercise.Name} started for {exercise.Timing} seconds...");
-
-    while ((DateTime.Now - startTime).TotalSeconds < exercise.Timing)
+    while (true) 
     {
-        if (_visualizationWindow == null || _visualizationWindow.IsDisposed) break;
+        bool leftFootValid, rightFootValid;
+        (double Min, double Max) copRangeX = (-2.0, 2.0);
+        (double Min, double Max) copRangeY = (-2.0, 2.0);
 
-        double copX = 0, copY = 0;
-        if (exercise.LegsUsed.Contains("right"))
-        {
-            copX = _copXRight;
-            copY = _copYRight;
-        }
-        else if (exercise.LegsUsed.Contains("left"))
-        {
-            copX = _copXLeft;
-            copY = _copYLeft;
-        }
-        else if (exercise.LegsUsed.Contains("both"))
-        {
-            copX = (_copXLeft + _copXRight) / 2; 
-            copY = (_copYLeft + _copYRight) / 2;
-        }
+        double copXLeft = _copXLeft, copYLeft = _copYLeft;
+        double copXRight = _copXRight, copYRight = _copYRight;
 
-        // Determine primary zones (Green and Red)
-        bool isGreenZone = exercise.IsInGreenZone(copX, copY);
-        bool isRedZone = exercise.IsInRedZone(copX, copY);
-        bool isOutOfZone = !isGreenZone && !isRedZone;
-
-        // Determine additional position zones (3, 4, 5, 6)
-        int positionZone = 0;
-        if (copX > 0 && copY > 0)
+        leftFootValid = copXLeft >= copRangeX.Min && copXLeft <= copRangeX.Max &&
+                        copYLeft >= copRangeY.Min && copYLeft <= copRangeY.Max;
+        rightFootValid = copXRight >= copRangeX.Min && copXRight <= copRangeX.Max &&
+                         copYRight >= copRangeY.Min && copYRight <= copRangeY.Max;
+        if (leftFootValid && rightFootValid)
         {
-            positionZone = 3; // Front Right
-        }
-        else if (copX < 0 && copY > 0)
-        {
-            positionZone = 4; // Front Left
-        }
-        else if (copX > 0 && copY < 0)
-        {
-            positionZone = 5; // Back Right
-        }
-        else if (copX < 0 && copY < 0)
-        {
-            positionZone = 6; // Back Left
-        }
-        if (isGreenZone && lastZone != 1)
-        {
-            Console.WriteLine("Zone 1 (Green)");
-            lastZone = 1;
-            wasInGreenZone = true;
-            wasInRedZone = false;
-            wasOutOfZone = false;
-        }
-        else if (isRedZone && !wasInRedZone)
-        {
-            Console.WriteLine("Zone 2 (Red Zone)");
-            if (positionZone > 0)
+            if ((DateTime.Now - startTime).TotalSeconds >= duration)
             {
-                Console.WriteLine($"Zone {positionZone}");
+                Console.WriteLine("[Preparation CoP]: Feet correctly positioned for the required time. ");
+                return;
             }
-            wasInRedZone = true;
-            wasOutOfZone = false;
-            lastZone = 2;
-        }
-        else if (isOutOfZone && !wasOutOfZone)
-        {
-            Console.WriteLine("Out of Zone");
-            if (positionZone > 0)
-            {
-                Console.WriteLine($"Zone {positionZone}");
-            }
-            wasOutOfZone = true;
-            wasInRedZone = false;
-            lastZone = 0;
-        }
-        if (isGreenZone)
-        {
-            outOfZoneTime = DateTime.MinValue;
         }
         else
         {
-            if (outOfZoneTime == DateTime.MinValue)
-            {
-                outOfZoneTime = DateTime.Now;
-            }
-            else if ((DateTime.Now - outOfZoneTime).TotalSeconds >= 4)
-            {
-                lostBalance = true;
-                break;
-            }
+            startTime = DateTime.Now; // Reset timer if feet move out of position
         }
-    }
-
-    if (lostBalance)
-    {
-        Console.WriteLine("You lost balance, exercise restarts in 5 seconds...");
-        Thread.Sleep(5000);
-        await RunExerciseAsync(exercise);
-    }
-    else
-    {
-        Console.WriteLine("Good work! Now is a pause for 15 seconds.");
-        Thread.Sleep(15000);
-
-        if (exercise.ExerciseID == 2 && setCount == 0)
-        {
-            setCount++; // Marks that the first set of exercises has been done once
-            var firstExercise = ExerciseList.Exercises.FirstOrDefault(e => e.ExerciseID == 1);
-            if (firstExercise != null)
-            {
-                await RunExerciseAsync(firstExercise);
-            }
-            return;
-        }
-
-        int nextExerciseID = exercise.ExerciseID + 1;
-        var nextExercise = ExerciseList.Exercises.FirstOrDefault(e => e.ExerciseID == nextExerciseID);
-        if (nextExercise != null)
-        {
-            await RunExerciseAsync(nextExercise);
-        }
-        else
-        {
-            Console.WriteLine("All exercises completed! Well done.");
-            _isVisualizing = false;
-        }
+        await Task.Delay(1000).ConfigureAwait(false); 
     }
 }
 
-       private void HandleStopCommand()
+        private async Task RunExerciseAsync(ExerciseData exercise)
+        {
+           
+            if (exercise.ExerciseID == 1 || exercise.ExerciseID == 2 ){
+                await Task.Delay(exercise.Switch*1000); // shows exercise  text for 3 seconds so both client and hmd wait
+            }
+            Console.WriteLine($"[Exercise]: {exercise.Name} started for {exercise.TimingCop} seconds...");
+            SendMessageToGUI($"[Exercise]: {exercise.Name} started for {exercise.TimingCop} seconds...");
+            DateTime exerciseStartTime = DateTime.Now;
+            int phaseIndex = 0;
+            int previousZoneLeft = -1;
+            int previousZoneRight = -1;
+            int feedbackLeft = -1;
+            int feedbackRight = -1;
+
+           
+            
+
+            while ((DateTime.Now - exerciseStartTime).TotalSeconds < exercise.TimingCop)
+            {
+                var phase = exercise.ZoneSequence[phaseIndex];
+
+                Console.WriteLine($"[Phase {phaseIndex + 1}]: {phase.Duration} sec");
+
+                DateTime phaseStartTime = DateTime.Now;
+                bool lostBalance = false;
+                DateTime outOfZoneTimeLeft = DateTime.MinValue;
+                DateTime outOfZoneTimeRight = DateTime.MinValue;
+                int currentZoneLeft = -1, currentZoneRight = -1;
+
+                while ((DateTime.Now - phaseStartTime).TotalSeconds < phase.Duration &&
+                       (DateTime.Now - exerciseStartTime).TotalSeconds < exercise.TimingCop)
+                {
+                    double copXLeft = _copXLeft, copYLeft = _copYLeft;
+                    double copXRight = _copXRight, copYRight = _copYRight;
+
+                    if (exercise.LegsUsed == "right")
+                    {
+                        currentZoneRight = Feedback(copXRight, copYRight, phase.GreenZoneX, phase.GreenZoneY, phase.RedZoneX, phase.RedZoneY);
+                        currentZoneLeft = -1; // No tracking for left foot
+                    }
+                    else if (exercise.LegsUsed == "left")
+                    {
+                        currentZoneLeft = Feedback(copXLeft, copYLeft, phase.GreenZoneX, phase.GreenZoneY, phase.RedZoneX, phase.RedZoneY);
+                        currentZoneRight = -1; // No tracking for right foot
+                    }
+                    else if (exercise.LegsUsed == "both")
+                    {
+                        currentZoneLeft = Feedback(copXLeft, copYLeft, phase.GreenZoneX, phase.GreenZoneY, phase.RedZoneX, phase.RedZoneY);
+                        currentZoneRight = Feedback(copXRight, copYRight, phase.GreenZoneX, phase.GreenZoneY, phase.RedZoneX, phase.RedZoneY);
+                    }
+                    if (currentZoneLeft != previousZoneLeft && currentZoneLeft != -1)
+                    {
+                        Console.WriteLine($"[Exercise]: Left Foot Changed to Zone {currentZoneLeft}");
+                        SendMessageToGUI($"[Exercise]: Left Foot Changed to Zone {currentZoneLeft}");
+                        previousZoneLeft = currentZoneLeft;
+                        feedbackLeft = currentZoneLeft;
+                        SendFeedback(feedbackLeft, "Left");
+                    }
+                    if (currentZoneRight != previousZoneRight && currentZoneRight != -1)
+                    {
+                        Console.WriteLine($"[Exercise]: Right Foot Changed to Zone {currentZoneRight}");
+                        SendMessageToGUI($"[Exercise]: Left Foot Changed to Zone {currentZoneRight}");
+                        previousZoneRight = currentZoneRight;
+                        feedbackRight = currentZoneRight;
+                        SendFeedback(feedbackRight, "Right");
+                    }
+                    if (currentZoneLeft == 1 || currentZoneRight == 1)
+                    {
+                        outOfZoneTimeLeft = DateTime.MinValue;
+                        outOfZoneTimeRight = DateTime.MinValue;
+                    }
+                    else
+                    {
+                        if (currentZoneLeft != -1 && outOfZoneTimeLeft == DateTime.MinValue)
+                        {
+                            outOfZoneTimeLeft = DateTime.Now;
+                        }
+                        if (currentZoneRight != -1 && outOfZoneTimeRight == DateTime.MinValue)
+                        {
+                            outOfZoneTimeRight = DateTime.Now;
+                        }
+                        bool leftFootOutTooLong = (outOfZoneTimeLeft != DateTime.MinValue) &&
+                                                  ((DateTime.Now - outOfZoneTimeLeft).TotalSeconds >= 2);
+                        bool rightFootOutTooLong = (outOfZoneTimeRight != DateTime.MinValue) &&
+                                                   ((DateTime.Now - outOfZoneTimeRight).TotalSeconds >= 2);
+
+                        if (leftFootOutTooLong || rightFootOutTooLong)
+                        {
+                            lostBalance = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (lostBalance)
+                {
+                    Console.WriteLine("You lost balance, restarting exercise...");
+                    SendMessageToGUI("You lost balance, restarting exercise...");
+                    if (exercise.LegsUsed == "both" || exercise.LegsUsed == "left")
+                    {
+                        if (previousZoneLeft != 7)
+                        {
+                            SendFeedback(7, "Left");
+                            previousZoneLeft = 7;
+                        }
+                    }
+                    if (exercise.LegsUsed == "both" || exercise.LegsUsed == "right")
+                    {
+                        if (previousZoneRight != 7)
+                        {
+                            SendFeedback(7, "Right");
+                            previousZoneRight = 7;
+                        }
+                    }
+                    await Task.Delay(5000).ConfigureAwait(false);
+                    exerciseStartTime = DateTime.Now;
+                    continue;
+                }
+                phaseIndex++;
+                if (phaseIndex >= exercise.ZoneSequence.Count)
+                {
+                    phaseIndex = 0;
+                }
+            }
+           Console.WriteLine("[Client]: Put leg down");
+           SendMessageToGUI("[Client]: Put leg down");
+           
+        await Task.Delay(exercise.Release*1000);
+        if (exercise.LegsUsed != "both"){
+        Console.WriteLine("[Client]: Running switch");
+        SendMessageToGUI("[Client]: Running switch");
+        await Task.Delay(exercise.Switch*1000);
+            }
+
+            Console.WriteLine($"[Exercise]: {exercise.Name} fully completed.");
+        }
+
+        private void SendFeedback(int feedbackCode, string foot)
+        {
+            Console.WriteLine($"[Feedback]: Sending code {feedbackCode} for {foot} foot");
+            var feedbackMessage = new FeedbackMessage
+            {
+                MessageType = "Feedback",
+                ExerciseID = currentExerciseID,
+                Foot = foot,
+                Zone = feedbackCode
+            };
+            SendDataToHMD(feedbackMessage);
+        }
+
+        private void SendExerciseConfiguration(ExerciseData exercise)
+        {
+            Console.WriteLine($"[Feedback]: Sending exercise configuration for exercise {exercise.ExerciseID}");
+            var configMessage = new ExerciseConfigMessage
+            {
+                MessageType = "ExerciseConfig",
+                ExerciseID = exercise.ExerciseID,
+                Name = exercise.Name,
+                LegsUsed = exercise.LegsUsed,
+                Intro = exercise.Intro,
+                Demo = exercise.Demo,
+                PreparationCop = exercise.PreparationCop,
+                TimingCop = exercise.TimingCop,
+                Release = exercise.Release,
+                Switch = exercise.Switch,
+                Sets = exercise.Sets,
+                ZoneSequence = exercise.ZoneSequence
+            };
+            SendDataToHMD(configMessage);
+            
+            
+        }
+
+        private int Feedback(double copX, double copY, (double, double) greenZoneX, (double, double) greenZoneY,
+                              (double, double) redZoneX, (double, double) redZoneY)
+        {
+            bool isInGreenZone = copX >= greenZoneX.Item1 && copX <= greenZoneX.Item2 &&
+                                 copY >= greenZoneY.Item1 && copY <= greenZoneY.Item2;
+
+            if (isInGreenZone)
+                return 1; //Green Zone
+
+            bool isInRedZone = copX >= redZoneX.Item1 && copX <= redZoneX.Item2 &&
+                               copY >= redZoneY.Item1 && copY <= redZoneY.Item2;
+            if (isInRedZone)
+                return 2; //Red Zone
+
+            if (copX > 0 && copY > 0)
+                return 3; //Front Right
+            else if (copX < 0 && copY > 0)
+                return 4; //Front Left
+            else if (copX > 0 && copY < 0)
+                return 5; //Back Right
+            else if (copX < 0 && copY < 0)
+                return 6; //Back Left
+
+            return 0;
+        }
+
+        private void HandleStopCommand()
         {
             if (!_isVisualizing)
             {
@@ -352,19 +507,18 @@ private async Task RunExerciseAsync(ExerciseData exercise)
             _server.StopDataStream();
             CloseVisualizationWindow();
             _isVisualizing = false;
+            CloseHMD();
             Console.WriteLine("[Client]: Visualization and data streams stopped.");
         }
 
         private void SubscribeToDeviceUpdates()
         {
             var activeDevices = _server.Manager.GetConnectedDevices();
-
             if (!activeDevices.Any())
             {
                 Console.WriteLine("[Client]: No active devices to subscribe to.");
                 return;
             }
-
             foreach (var device in activeDevices)
             {
                 device.CoPUpdated -= OnCoPUpdated;
@@ -378,6 +532,11 @@ private async Task RunExerciseAsync(ExerciseData exercise)
 
     if (sender is Device device)
     {
+         if ((_currentExercise?.ExerciseID == 5 || _currentExercise?.ExerciseID == 6) && _currentPhase == 8)
+        {
+            Console.WriteLine($"[Client]: Skipping CoP check for Exercise {_currentExercise.ExerciseID}, Phase 8.");
+            return; 
+        }
         if (device.IsLeftSock)
         {
             _copXLeft = copData.CoPX;
@@ -400,22 +559,20 @@ private async Task RunExerciseAsync(ExerciseData exercise)
     }
 }
 
-      private void OpenVisualizationWindow()
-{
-    if (_visualizationWindow == null || _visualizationWindow.IsDisposed)
-    {
-        Thread visualizationThread = new Thread(() =>
+        private void OpenVisualizationWindow()
         {
-            _visualizationWindow = new VisualizationWindow();
-            System.Windows.Forms.Application.Run(_visualizationWindow);
-        });
-
-        visualizationThread.SetApartmentState(ApartmentState.STA); // Set STA mode for Windows Forms
-        visualizationThread.IsBackground = true; // Allows process to exit properly
-        visualizationThread.Start();
-    }
-}
-
+            if (_visualizationWindow == null || _visualizationWindow.IsDisposed)
+            {
+                Thread visualizationThread = new Thread(() =>
+                {
+                    _visualizationWindow = new VisualizationWindow();
+                    System.Windows.Forms.Application.Run(_visualizationWindow);
+                });
+                visualizationThread.SetApartmentState(ApartmentState.STA);
+                visualizationThread.IsBackground = true;
+                visualizationThread.Start();
+            }
+        }
 
         private void CloseVisualizationWindow()
         {
@@ -425,28 +582,92 @@ private async Task RunExerciseAsync(ExerciseData exercise)
                 _visualizationWindow = null;
             }
         }
-//################################### HMD ########################################
+
+        //################################### HMD ########################################
         private void HandleHMDCommand()
         {
             Console.WriteLine("1. Connect to HMD\n2. Disconnect from HMD\n3. Exit HMD Menu");
             Console.Write("> ");
-
             string input = Console.ReadLine()?.Trim();
-            if (input == "1") ConnectToHMD("127.0.0.1", 9001);
-            else if (input == "2") DisconnectFromHMD();
+            if (input == "1")
+                ConnectToHMD("127.0.0.1", 9001);
+            else if (input == "2")
+                DisconnectFromHMD();
         }
 
-        private void ConnectToHMD(string ipAddress, int port)
+       private void ConnectToHMD(string ipAddress, int port)
+{
+    try
+    {
+        // Ensure HMD application is running
+        string processName = Path.GetFileNameWithoutExtension(hmdpath);
+        Process[] hmdProcesses = Process.GetProcessesByName(processName);
+        if (hmdProcesses.Length == 0)
+        {
+            Console.WriteLine("Starting HMD application...");
+            try
+            {
+                _hmdProcess = Process.Start(hmdpath);
+                Thread.Sleep(5000); // Give it time to start
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to start HMD application: {ex.Message}");
+                return;
+            }
+        }
+
+        // Check if already connected (more robust check)
+        if (_hmdClient != null && _hmdClient.Connected)
         {
             try
             {
-                if (_hmdClient != null && _hmdClient.Connected) return;
+                if (_hmdClient.Client.Poll(0, SelectMode.SelectRead) && _hmdClient.Client.Available == 0)
+                {
+                    Console.WriteLine("Connection lost. Reconnecting...");
+                }
+                else
+                {
+                    Console.WriteLine("Already connected to HMD.");
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Connection check failed: {ex.Message}");
+            }
+        }
+
+        // Attempt to connect with retries
+        int retries = 4;
+        int delay = 3000;
+        for (int i = 0; i < retries; i++)
+        {
+            try
+            {
+                // Close previous failed client before retrying
+                _hmdClient?.Close();
                 _hmdClient = new TcpClient(ipAddress, port);
                 _hmdStream = _hmdClient.GetStream();
+                
                 Console.WriteLine("HMD Connected.");
+                return; // Connection successful
             }
-            catch (Exception ex) { Console.WriteLine($"Error: {ex.Message}"); }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Connection attempt {i + 1} failed: {ex.Message}. Retrying...");
+                Thread.Sleep(delay);
+            }
         }
+
+        Console.WriteLine("Failed to connect to HMD after multiple attempts.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error connecting to HMD: {ex.Message}");
+    }
+}
+
 
         private void DisconnectFromHMD()
         {
@@ -457,124 +678,139 @@ private async Task RunExerciseAsync(ExerciseData exercise)
             Console.WriteLine("HMD Disconnected.");
         }
 
-        private void SendDataToHMD(object copData)
+        private void CloseHMD()
+{
+    try
+    {
+        if (_hmdProcess != null && !_hmdProcess.HasExited)
+        {
+            _hmdStream?.Close();
+            _hmdClient?.Close();
+            _hmdStream = null;
+            _hmdClient = null;
+            Console.WriteLine("Closing HMD application...");
+            _hmdProcess.Kill();  // Kill the process
+            _hmdProcess.WaitForExit();  // Ensure the process has exited before continuing
+            Console.WriteLine("HMD application closed.");
+        }
+        else
+        {
+            Console.WriteLine("HMD application is not running.");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Failed to close HMD application: {ex.Message}");
+    }
+}
+
+        private void SendDataToHMD(object data)
         {
             try
             {
-                string jsonData = JsonSerializer.Serialize(copData);
+                if(data != null){
+                      string jsonData = JsonSerializer.Serialize(data);
                 byte[] dataBytes = Encoding.UTF8.GetBytes(jsonData);
                 _hmdStream.Write(dataBytes, 0, dataBytes.Length);
-                _hmdStream.Flush();
+                _hmdStream.Flush();  
+                }else{
+                    Console.WriteLine("no work");
+    
+                }
+                
             }
             catch (Exception ex) { Console.WriteLine($"Error sending data: {ex.Message}"); }
         }
 
-        //########################### GUI communication ############################
+        //################################### GUI communication ########################################
         private void OpenGUI()
-{
-    try
-    {
-        Process.Start(guipath);
-        Console.WriteLine("GUI launched. Waiting for connection...");
-
-        Thread.Sleep(2000); // Ensure the GUI starts
-        
-
-        _guiClient = new TcpClient("127.0.0.1", 5555); // Connect to the GUI server
-        _guiStream = _guiClient.GetStream();
-        Console.WriteLine("Connected to GUI.");
-
-        Task.Run(() => ListenForGUIResponses());
-        SendMessageToGUI("connect");
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Failed to connect to GUI: {ex.Message}");
-    }
-}
-
-      private async Task ListenForGUIResponses()
-{
-    byte[] buffer = new byte[1024];
-
-    while (_guiClient?.Connected == true)
-    {
-        try
         {
-            int bytesRead = await _guiStream.ReadAsync(buffer, 0, buffer.Length);
-            if (bytesRead == 0)
+            try
             {
-                Console.WriteLine("[Client]: Connection closed by GUI.");
-                break; // The connection has been closed, stop listening.
+                Process.Start(guipath);
+                Console.WriteLine("GUI launched. Waiting for connection...");
+                Thread.Sleep(2000);
+                _guiClient = new TcpClient("127.0.0.1", 5555);
+                _guiStream = _guiClient.GetStream();
+                Console.WriteLine("Connected to GUI.");
+                Task.Run(() => ListenForGUIResponses());
+                SendMessageToGUI("connect");
             }
-
-            string response = Encoding.UTF8.GetString(buffer, 0, bytesRead).Trim();
-            Console.WriteLine($"[GUI]: {response}");
-
-            // Handle specific response messages
-            if (response.ToLower() == "connect")
+            catch (Exception ex)
             {
-                Console.WriteLine("[Client]: Connect command received from GUI.");
-                await HandleConnectCommandAsync(CancellationToken.None);
-            }
-            if (response.ToLower() == "calibrate")
-            {
-                Console.WriteLine("[Client]: Calibrate command received from GUI.");
-                 HandleCalibrateCommand();
-            }
-            if (response.ToLower() == "start")
-            {
-                Console.WriteLine("[Client]: Start command received from GUI.");
-                 HandleStartCommand();
-            }
-            if (response.ToLower() == "stop")
-            {
-                
-                HandleStopCommand();
-                Console.WriteLine("[Client]: Stop command received from GUI.");
-                 
-            }
-            if (response.ToLower() == "hmd")
-            {
-                Console.WriteLine("[Client]: HMD command received from GUI.");
-                 HandleHMDCommand();
-            }
-            if (response.ToLower() == "1")
-            {
-                Console.WriteLine("[Client]: 1 command received from GUI.");
-                 ConnectToHMD("127.0.0.1", 9001);
-            }
-            if (response.ToLower() == "2")
-            {
-                Console.WriteLine("[Client]: 2 command received from GUI.");
-                 DisconnectFromHMD();
-            }
-            if (response.ToLower() == "exit")
-            {
-                Console.WriteLine("[Client]: Exit command received from GUI.");
-                
-                HandleExitCommand();
-                Environment.Exit(0);
-               
-                
-            }
-            else
-            {
-                Console.WriteLine("[Client]: Unrecognized message from GUI.");
+                Console.WriteLine($"Failed to connect to GUI: {ex.Message}");
             }
         }
-        catch (Exception ex)
+
+        private async Task ListenForGUIResponses()
         {
-            Console.WriteLine($"Error while listening for GUI responses: {ex.Message}");
-            break; // If error occurs, stop listening
+            byte[] buffer = new byte[1024];
+            while (_guiClient?.Connected == true)
+            {
+                try
+                {
+                    int bytesRead = await _guiStream.ReadAsync(buffer, 0, buffer.Length);
+                    if (bytesRead == 0)
+                    {
+                        Console.WriteLine("[Client]: Connection closed by GUI.");
+                        break;
+                    }
+                    string response = Encoding.UTF8.GetString(buffer, 0, bytesRead).Trim();
+                    Console.WriteLine($"[GUI]: {response}");
+                    if (response.ToLower() == "connect")
+                    {
+                        Console.WriteLine("[Client]: Connect command received from GUI.");
+                        await HandleConnectCommandAsync(CancellationToken.None);
+                    }
+                    if (response.ToLower() == "calibrate")
+                    {
+                        Console.WriteLine("[Client]: Calibrate command received from GUI.");
+                        HandleCalibrateCommand();
+                    }
+                    if (response.ToLower() == "start")
+                    {
+                        Console.WriteLine("[Client]: Start command received from GUI.");
+                        await HandleStartCommand();
+                    }
+                    if (response.ToLower() == "stop")
+                    {
+                        HandleStopCommand();
+                        Console.WriteLine("[Client]: Stop command received from GUI.");
+                    }
+                    if (response.ToLower() == "hmd")
+                    {
+                        Console.WriteLine("[Client]: HMD command received from GUI.");
+                        HandleHMDCommand();
+                    }
+                    if (response.ToLower() == "1")
+                    {
+                        Console.WriteLine("[Client]: 1 command received from GUI.");
+                        ConnectToHMD("127.0.0.1", 9001);
+                    }
+                    if (response.ToLower() == "2")
+                    {
+                        Console.WriteLine("[Client]: 2 command received from GUI.");
+                        DisconnectFromHMD();
+                    }
+                    if (response.ToLower() == "exit")
+                    {
+                        Console.WriteLine("[Client]: Exit command received from GUI.");
+                        HandleExitCommand();
+                        Environment.Exit(0);
+                    }
+                    else
+                    {
+                        Console.WriteLine("[Client]: Unrecognized message from GUI.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error while listening for GUI responses: {ex.Message}");
+                    break;
+                }
+            }
+            Console.WriteLine("[Client]: Stopped listening for GUI responses.");
         }
-    }
-
-    // Ensure the client disconnects properly
-    Console.WriteLine("[Client]: Stopped listening for GUI responses.");
-}
-
-
 
         private void SendMessageToGUI(string message)
         {
@@ -585,7 +821,6 @@ private async Task RunExerciseAsync(ExerciseData exercise)
                     Console.WriteLine("Not connected to GUI.");
                     return;
                 }
-
                 byte[] messageBytes = Encoding.UTF8.GetBytes(message);
                 _guiStream.Write(messageBytes, 0, messageBytes.Length);
                 _guiStream.Flush();
@@ -596,58 +831,54 @@ private async Task RunExerciseAsync(ExerciseData exercise)
             }
         }
 
-private void SendCommandToServer(string command)
-{
-    Console.WriteLine(command);  // Server will read this via Console.ReadLine()
-    Console.Out.Flush(); // Ensures the command is sent immediately
-    Console.WriteLine($"[Client]: Sent command to server: {command}");
-}
-// private void ReconnectToServer()
-// {
-//     try
-//     {
-//         if (_guiClient == null || !_guiClient.Connected)
-//         {
-//             Console.WriteLine("[Client]: Attempting to reconnect...");
-//             _guiClient = new TcpClient("127.0.0.1", 5555);
-//             _guiStream = _guiClient.GetStream();
-//             Console.WriteLine("[Client]: Reconnected to GUI.");
-//             Task.Run(() => ListenForGUIResponses());
-//         }
-//     }
-//     catch (Exception ex)
-//     {
-//         Console.WriteLine($"Failed to reconnect: {ex.Message}");
-//     }
-// }
-
-private void CloseGUI()
-{
-    try
-    {
-        if (_guiClient?.Connected == true)
+        private void CloseGUI()
         {
-            _guiStream?.Close();
-            _guiClient?.Close();
-            Console.WriteLine("[Client]: Disconnected from GUI.");
-        }
+            try
+            {
+                if (_guiClient?.Connected == true)
+                {
+                    _guiStream?.Close();
+                    _guiClient?.Close();
+                    Console.WriteLine("[Client]: Disconnected from GUI.");
+                }
 
-        // Optionally, close the GUI process itself if necessary
-        Process[] processes = Process.GetProcessesByName("clientgui");  // The name of the GUI process
-        foreach (var process in processes)
-        {
-            process.Kill();
-            Console.WriteLine("[Client]: GUI process terminated.");
+                Process[] processes = Process.GetProcessesByName("clientgui");
+                foreach (var process in processes)
+                {
+                    process.Kill();
+                    Console.WriteLine("[Client]: GUI process terminated.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Client]: Error closing GUI: {ex.Message}");
+            }
         }
     }
-    catch (Exception ex)
+
+    // Message classes for JSON serialization
+    public class FeedbackMessage
     {
-        Console.WriteLine($"[Client]: Error closing GUI: {ex.Message}");
+        public string MessageType { get; set; }
+        public int ExerciseID { get; set; }
+        public string Foot { get; set; }
+        public int Zone { get; set; }
     }
-}
+    
 
-
-
-
+    public class ExerciseConfigMessage
+    {
+        public string MessageType { get; set; }
+        public int ExerciseID { get; set; }
+        public string Name { get; set; }
+        public string LegsUsed { get; set; }
+        public int Intro { get; set; }
+        public int Demo { get; set; }
+        public int PreparationCop { get; set; }
+        public int TimingCop { get; set; }
+        public int Release { get; set; }
+        public int Switch { get; set; }
+        public int Sets { get; set; }
+        public System.Collections.Generic.List<ZoneSequenceItem> ZoneSequence { get; set; }
     }
 }
