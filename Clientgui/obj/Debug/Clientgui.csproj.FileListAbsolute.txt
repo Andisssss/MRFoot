@@ -1,0 +1,9 @@
+C:\Users\Lietotajs\Desktop\Clientgui\bin\Debug\Clientgui.exe.config
+C:\Users\Lietotajs\Desktop\Clientgui\bin\Debug\Clientgui.exe
+C:\Users\Lietotajs\Desktop\Clientgui\bin\Debug\Clientgui.pdb
+C:\Users\Lietotajs\Desktop\Clientgui\obj\Debug\Clientgui.csproj.AssemblyReference.cache
+C:\Users\Lietotajs\Desktop\Clientgui\obj\Debug\Clientgui.Properties.Resources.resources
+C:\Users\Lietotajs\Desktop\Clientgui\obj\Debug\Clientgui.csproj.GenerateResource.cache
+C:\Users\Lietotajs\Desktop\Clientgui\obj\Debug\Clientgui.csproj.CoreCompileInputs.cache
+C:\Users\Lietotajs\Desktop\Clientgui\obj\Debug\Clientgui.exe
+C:\Users\Lietotajs\Desktop\Clientgui\obj\Debug\Clientgui.pdb

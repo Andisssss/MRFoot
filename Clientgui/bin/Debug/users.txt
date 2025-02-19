@@ -1,0 +1,4 @@
+1,Andis,23,Female,189,170,43,Right,LF,none
+2,Kristaps,20,F,120,190,43,R,LW,none
+3,Abduls,19,Vīrietis,76,180,43,Labā,Defensīvais puslodzis (CDM),nav
+4,s d,asd,Sieviete,asd,sd,asd,Kreisā,Mala aizsargs (LB / RB),asd
