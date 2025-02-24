@@ -99,14 +99,15 @@ public async Task HandleConnectCommandAsync(CancellationToken cancellationToken,
     // Call HandlePortResponse to get the ports array
     Console.WriteLine("[Server]: Scanning available COM ports...");
 var ports = SensorAdapter.ScanPorts();
-    
-
+    if (ports.Count == 0)
+            {
+                Console.WriteLine("[Server]: No available COM ports.");
+                return;
+            }
     Console.WriteLine("[Server]: Received COM ports: " + string.Join(", ", ports));
-
     // Send the list of available COM ports to the client
     await sendPortsToClient(ports.ToList());
-
-string[] coms = GetPorts(); // Here you define the ports directly inside the method
+    string[] coms = GetPorts(); // Here you define the ports directly inside the method
 
   
 
@@ -180,7 +181,7 @@ string[] coms = GetPorts(); // Here you define the ports directly inside the met
                 {
                     try
                     {
-                        bool calibrationSuccessful = device.Calibrate();
+                        bool calibrationSuccessful = device.Calibrate(device.IsLeftSock);
 
                         if (calibrationSuccessful)
                         {

@@ -16,7 +16,7 @@ namespace DAid.Clients
     public class Client
     {
         string hmdpath = "C:/Users/Lietotajs/Desktop/balls/OculusIntegration_trial.exe"; // change as needed
-        string guipath = "C:/Users/Lietotajs/Desktop/Clientgui/bin/Debug/clientgui.exe"; // change as needed
+        string guipath = "C:/Users/Lietotajs/Desktop/Clientgui/bin/Debug/clientgui.exe"; // change as needed, need to run once gui alone
         string portFilePath = "C:/Users/Lietotajs/Desktop/Clientgui/bin/Debug/selected_ports.txt"; // change as needed
 
         private Process _hmdProcess;
@@ -25,6 +25,8 @@ namespace DAid.Clients
         private bool _isCalibrated = false;
         private bool _isVisualizing = false;
 
+        private bool _bypassHMD = false; // New bypass flag
+
         // Internal sensor values (CoP)
         private double _copXLeft = 0, _copYLeft = 0;
         private double _copXRight = 0, _copYRight = 0;
@@ -32,7 +34,6 @@ namespace DAid.Clients
 private ExerciseData _currentExercise;
         private int _currentPhase;
         
-        int setCount = 0;
 
         private TcpClient _hmdClient;
         private NetworkStream _hmdStream;
@@ -41,7 +42,6 @@ private ExerciseData _currentExercise;
         private NetworkStream _guiStream;
 
         // New flag for exercise active state.
-        private volatile bool _isExerciseActive = false;
 
         // To store current exercise ID for feedback messages.
         private int currentExerciseID = 0;
@@ -55,6 +55,7 @@ private ExerciseData _currentExercise;
         {
             Console.WriteLine("Client started. Enter commands: connect, calibrate, start, stop, hmd, gui, exit");
             OpenGUI();
+            _bypassHMD = true; // Bypass HMD connection for now
 
             while (!cancellationToken.IsCancellationRequested)
             {
@@ -86,12 +87,6 @@ private ExerciseData _currentExercise;
                             break;
                         case "stop":
                             HandleStopCommand();
-                            break;
-                        case "hmd":
-                            HandleHMDCommand();
-                            break;
-                        case "gui":
-                            OpenGUI();
                             break;
                         case "exit":
                             HandleExitCommand();
@@ -173,6 +168,9 @@ private ExerciseData _currentExercise;
             }
             Console.WriteLine("Requesting server to calibrate connected devices...");
             SendMessageToGUI("Requesting server to calibrate connected devices...");
+            Console.WriteLine("[Calibration]: Stand with both feet. Lift each foot one at a time after 1 second.");
+             SendMessageToGUI("[Calibration]: Stand with both feet. Lift each foot one at a time after 1 second.");
+            
             _server.HandleCalibrateCommand();
             _isCalibrated = true;
             Console.WriteLine("Calibration completed. Use 'start' to begin visualization.");
@@ -193,20 +191,17 @@ private ExerciseData _currentExercise;
                 return;
             }
             _server.StartDataStream();
-           OpenVisualizationWindow();
+            OpenVisualizationWindow();
             ConnectToHMD("127.0.0.1", 9001);
             SubscribeToDeviceUpdates();
             _isVisualizing = true;
 
             var exercises = ExerciseList.Exercises;
             var completedExerciseSets = new HashSet<int>();
-
-    // repeating exercise groups after left and right
-    var repeatSet = new Dictionary<int, List<int>>
+            // repeating exercise groups after left and right
+            var repeatSet = new Dictionary<int, List<int>>
     {
         { 2, new List<int> { 1, 2 } },  // Repeat 1 & 2 after 2
-        { 6, new List<int> { 5, 6 } },  // Repeat 5 & 6 after 6
-        { 8, new List<int> { 7, 8 } },  // Repeat 7 & 8 after 8
         { 10, new List<int> { 9, 10 } } // Repeat 9 & 10 after 10
     };
 
@@ -220,8 +215,7 @@ private ExerciseData _currentExercise;
         if (i == 1 && count == 0)
             {
                 count++;
-
-                Thread.Sleep(1000);
+                Thread.Sleep(1000); // sends left leg stance for exercise 1 and delays so the client isnt ahead
             }
          if (!completedExerciseSets.Contains(exercise.RepetitionID))
          {
@@ -315,19 +309,15 @@ private ExerciseData _currentExercise;
 }
         private async Task RunExerciseAsync(ExerciseData exercise)
         {
-           
             if (exercise.RepetitionID == 1 || exercise.RepetitionID == 2 ){
-                await Task.Delay(exercise.Release*1000); // shows exercise  text for 3 seconds so both client and hmd wait
+                await Task.Delay(3000).ConfigureAwait(false);  // shows exercise  text for 3 seconds so both client and hmd wait
             }
             Console.WriteLine($"[Exercise]: {exercise.Name} started for {exercise.TimingCop} seconds...");
             SendMessageToGUI($"[Exercise]: {exercise.Name} started for {exercise.TimingCop} seconds...");
             DateTime exerciseStartTime = DateTime.Now;
             int phaseIndex = 0;
-    List<int> previousZonesLeft = new List<int>();
-    List<int> previousZonesRight = new List<int>();
-            
-           
-            
+            List<int> previousZonesLeft = new List<int>();
+            List<int> previousZonesRight = new List<int>();
 
             while ((DateTime.Now - exerciseStartTime).TotalSeconds < exercise.TimingCop)
             {
@@ -476,7 +466,32 @@ private ExerciseData _currentExercise;
             }
         }
 
-                private List<int> AddCopLeft(ExerciseData exercise, int phaseIndex)
+        private List<int> Feedback(double copX, double copY,  
+                          (double Min, double Max) greenZoneX, (double Min, double Max) greenZoneY, 
+                          (double Min, double Max) redZoneX, (double Min, double Max) redZoneY)
+{
+    List<int> feedbacks = new List<int>();
+
+    if (copX >= greenZoneX.Min && copX <= greenZoneX.Max &&
+        copY >= greenZoneY.Min && copY <= greenZoneY.Max)
+    {
+        return new List<int> { 1 }; // Green Zone
+    }
+
+    if (copX >= redZoneX.Min && copX <= redZoneX.Max &&
+        copY >= redZoneY.Min && copY <= redZoneY.Max)
+    {
+        feedbacks.Add(2); // Red Zone
+    }
+    if (copX < 0) feedbacks.Add(3); // Back
+    if (copX > 0) feedbacks.Add(4); // Front
+    if (copY > 0) feedbacks.Add(5); // Right
+    if (copY < 0) feedbacks.Add(6); // Left
+
+    return feedbacks.Count > 0 ? feedbacks : new List<int> { 0 };
+}
+
+                private List<int> AddCopLeft(ExerciseData exercise, int phaseIndex) //manually added cop zones for exercises 5&6, for lead/back leg
                 {
                     var adjustedZones = new List<int>();
                     (int, (double, double), (double, double), (double, double), (double, double)) phaseData;
@@ -501,7 +516,6 @@ private ExerciseData _currentExercise;
                 }
         private void SendFeedback(List<int> feedbackCodes, string foot)
         {
-            //Console.WriteLine($"[Feedback]: Sending code {feedbackCodes} for {foot} foot");
             var feedbackMessage = new FeedbackMessage
             {
                 MessageType = "Feedback",
@@ -529,35 +543,8 @@ private ExerciseData _currentExercise;
                 Sets = exercise.Sets,
                 ZoneSequence = exercise.ZoneSequence
             };
-            SendDataToHMD(configMessage);
-            
-            
+            SendDataToHMD(configMessage); 
         }
-
-     private List<int> Feedback(double copX, double copY,  
-                          (double Min, double Max) greenZoneX, (double Min, double Max) greenZoneY, 
-                          (double Min, double Max) redZoneX, (double Min, double Max) redZoneY)
-{
-    List<int> feedbacks = new List<int>();
-
-    if (copX >= greenZoneX.Min && copX <= greenZoneX.Max &&
-        copY >= greenZoneY.Min && copY <= greenZoneY.Max)
-    {
-        return new List<int> { 1 }; // Green Zone
-    }
-
-    if (copX >= redZoneX.Min && copX <= redZoneX.Max &&
-        copY >= redZoneY.Min && copY <= redZoneY.Max)
-    {
-        feedbacks.Add(2); // Red Zone
-    }
-    if (copX < 0) feedbacks.Add(3); // Back
-    if (copX > 0) feedbacks.Add(4); // Front
-    if (copY > 0) feedbacks.Add(5); // Right
-    if (copY < 0) feedbacks.Add(6); // Left
-
-    return feedbacks.Count > 0 ? feedbacks : new List<int> { 0 };
-}
 
         private void HandleStopCommand()
         {
@@ -595,9 +582,9 @@ private ExerciseData _currentExercise;
 
     if (sender is Device device)
     {
-         if ((_currentExercise?.RepetitionID == 5 || _currentExercise?.RepetitionID == 6) && _currentPhase == 8)
+         if ((_currentExercise?.RepetitionID == 5 || _currentExercise?.RepetitionID == 6) && _currentPhase == 4)
         {
-            Console.WriteLine($"[Client]: Skipping CoP check for Exercise {_currentExercise.RepetitionID}, Phase 8.");
+            Console.WriteLine($"[Client]: Skipping CoP check for Exercise {_currentExercise.RepetitionID}, Phase 4.");
             return; 
         }
         if (device.IsLeftSock)
@@ -630,6 +617,7 @@ private ExerciseData _currentExercise;
                 {
                     _visualizationWindow = new VisualizationWindow();
                     System.Windows.Forms.Application.Run(_visualizationWindow);
+
                 });
                 visualizationThread.SetApartmentState(ApartmentState.STA);
                 visualizationThread.IsBackground = true;
@@ -649,6 +637,11 @@ private ExerciseData _currentExercise;
         //################################### HMD ########################################
         private void HandleHMDCommand()
         {
+            if (_bypassHMD)
+            {
+                Console.WriteLine("HMD is bypassed. Commands disabled.");
+                return;
+            }
             Console.WriteLine("1. Connect to HMD\n2. Disconnect from HMD\n3. Exit HMD Menu");
             Console.Write("> ");
             string input = Console.ReadLine()?.Trim();
@@ -660,6 +653,11 @@ private ExerciseData _currentExercise;
 
        private void ConnectToHMD(string ipAddress, int port)
 {
+    if (_bypassHMD)
+            {
+                Console.WriteLine("HMD bypassed. Not connecting.");
+                return;
+            }
     try
     {
         // Ensure HMD application is running
@@ -734,6 +732,11 @@ private ExerciseData _currentExercise;
 
         private void DisconnectFromHMD()
         {
+            if (_bypassHMD)
+            {
+                Console.WriteLine("HMD bypassed. Not disconnecting.");
+                return;
+            }
             _hmdStream?.Close();
             _hmdClient?.Close();
             _hmdStream = null;
@@ -743,6 +746,11 @@ private ExerciseData _currentExercise;
 
         private void CloseHMD()
 {
+    if (_bypassHMD)
+            {
+                Console.WriteLine("HMD bypassed. Not closing.");
+                return;
+            }
     try
     {
         if (_hmdProcess != null && !_hmdProcess.HasExited)
@@ -769,6 +777,11 @@ private ExerciseData _currentExercise;
 
         private void SendDataToHMD(object data)
         {
+            if (_bypassHMD)
+            {
+                Console.WriteLine("HMD bypassed. Data not sent.");
+                return;
+            }
             try
             {
                 if(data != null){

@@ -157,11 +157,11 @@ namespace DAid.Servers
             }
         }
 
-        public bool Calibrate()
+        public bool Calibrate(bool isLeftSock)
         {
             try
             {
-                bool success = sensorAdapter.Calibrate();
+                bool success = sensorAdapter.Calibrate(isLeftSock);
                 if (success)
                 {
                     return true;
