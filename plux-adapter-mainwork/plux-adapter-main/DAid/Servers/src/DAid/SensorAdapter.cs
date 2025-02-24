@@ -21,7 +21,7 @@ public class SensorAdapter
 
     private const int DefaultBaudRate = 92600;
     private readonly int[] RightSensorPositions = { 30, 32, 38, 40 };
-    private readonly int[] LeftSensorPositions = { 32, 30, 40, 38 };
+    private readonly int[] LeftSensorPositions = { 42, 30, 40, 44 }; // should be 32 (black wire, now orange), 30, 40, 38 (blue wire, now purple)
     private int[] SensorPositions;
 
     private readonly double[] XPositions = { 6.0, -6.0, 6.0, -6.0 };

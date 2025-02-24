@@ -68,7 +68,7 @@ namespace DAid.Clients
 
             bool hasLeftData = (DateTime.Now - lastLeftDataUpdate).TotalMilliseconds < DataTimeoutMilliseconds;
             bool hasRightData = (DateTime.Now - lastRightDataUpdate).TotalMilliseconds < DataTimeoutMilliseconds;
-            Console.WriteLine($"[Debug]:Pressures: {string.Join(", ", sensorPressuresLeft)}");
+            //Console.WriteLine($"[Debug]:Pressures: {string.Join(", ", sensorPressuresLeft)}");
 
 
      if (hasLeftData)
@@ -126,25 +126,29 @@ else
 
         private void DrawPressures(Graphics graphics, double[] pressures, int xOffset, bool isRightSock)
         {
-            double[] XPositions = { 6.0, -6.0, 6.0, -6.0 };
-            double[] YPositions = { 2.0, 2.0, -2.0, -2.0 };
+            double[] XPositions = { 3.0, -3.0, 3.0, -3.0 };
+            double[] YPositions = { 6.0, 6.0, -6.0, -6.0 };
 
+    if (!isRightSock)
+    {
+        XPositions = XPositions.Select(x => -x).ToArray();
+    }
 
-            double maxPressure = pressures.Length > 0 ? pressures.Max() : 1.0;
-            if (maxPressure <= 0.001) maxPressure = 1.0;
+    double maxPressure = pressures.Length > 0 ? pressures.Max() : 1.0;
+    if (maxPressure <= 0.001) maxPressure = 1.0;
 
-            for (int i = 0; i < pressures.Length; i++)
-            {
-                float intensity = (float)(pressures[i] / maxPressure);
-                intensity = Math.Max(0, Math.Min(1, intensity));
+    for (int i = 0; i < pressures.Length; i++)
+    {
+        float intensity = (float)(pressures[i] / maxPressure);
+        intensity = Math.Max(0, Math.Min(1, intensity));
 
-                Color pressureColor = Color.FromArgb((int)(255 * intensity), 0, 0);
-                float scaledX = (float)(xOffset + CanvasSize / 2 + XPositions[i] * (CanvasSize / 16));
-                float scaledY = (float)(CanvasSize / 2 - YPositions[i] * (CanvasSize / 16));
+        Color pressureColor = Color.FromArgb((int)(255 * intensity), 0, 0);
+        float scaledX = (float)(xOffset + CanvasSize / 2 + XPositions[i] * (CanvasSize / 16));
+        float scaledY = (float)(CanvasSize / 2 - YPositions[i] * (CanvasSize / 16));
 
-                graphics.FillEllipse(new SolidBrush(pressureColor), scaledX - 12, scaledY - 12, 24, 24);
-                graphics.DrawString($"S{i + 1}", new Font("Arial", 8), Brushes.Black, scaledX - 5, scaledY - 15);
-            }
+        graphics.FillEllipse(new SolidBrush(pressureColor), scaledX - 12, scaledY - 12, 24, 24);
+        graphics.DrawString($"S{i + 1}", new Font("Arial", 8), Brushes.Black, scaledX - 5, scaledY - 15);
+    }
         }
 
         private void DrawNoDataMessage(Graphics graphics, int xOffset)
